@@ -24,3 +24,9 @@
 - [x] Créer le tableau, les filtres, la sélection multiple et le panneau de synthèse.
 - [x] Ajouter les actions contextuelles, les états vide et chargement, et la pagination.
 - [x] Vérifier le rendu desktop et mobile puis enregistrer la livraison.
+
+## Suivi — Importation CSV des élèves
+
+- [x] Définir le format CSV attendu et les règles de validation.
+- [x] Ajouter l’assistant d’importation avec sélection, aperçu et confirmation.
+- [x] Vérifier le parcours desktop et mobile puis enregistrer la livraison.

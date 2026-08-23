@@ -3,6 +3,8 @@
  * l’identité élève pérenne reste distincte de l’inscription annuelle et de ses statuts.
  */
 import { QuickActionModal } from "@/components/QuickActionModal";
+import { StudentCsvImportModal } from "@/components/StudentCsvImportModal";
+import type { CsvStudentRow } from "@/components/StudentCsvImportModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,12 +42,13 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
+  Upload,
   UserRound,
   WalletCards,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-type Student = {
+export type Student = {
   id: string;
   matricule: string;
   fullName: string;
@@ -94,11 +97,13 @@ export function StudentManagement({ onToast, onSuccess }: { onToast: (title: str
   const [isLoading, setIsLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [studentModal, setStudentModal] = useState(false);
+  const [importModal, setImportModal] = useState(() => new URLSearchParams(window.location.search).get("import") === "csv");
+  const [importedStudents, setImportedStudents] = useState<Student[]>([]);
   const pageSize = 5;
 
   const filteredStudents = useMemo(() => {
     const normalized = search.trim().toLowerCase();
-    return students.filter((student) => {
+    return [...importedStudents, ...students].filter((student) => {
       const matchesSearch = !normalized || [student.fullName, student.matricule].some((value) => value.toLowerCase().includes(normalized));
       const matchesLevel = level === "Tous" || student.level === level;
       const matchesClass = classFilter === "Toutes" || student.className === classFilter;
@@ -110,19 +115,25 @@ export function StudentManagement({ onToast, onSuccess }: { onToast: (title: str
 
   const visibleStudents = filteredStudents.slice((page - 1) * pageSize, page * pageSize);
   const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
-  const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? null;
+  const selectedStudent = [...importedStudents, ...students].find((student) => student.id === selectedStudentId) ?? null;
   const allVisibleSelected = visibleStudents.length > 0 && visibleStudents.every((student) => selectedIds.includes(student.id));
 
   const toggleSelection = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   const toggleAll = (checked: boolean) => setSelectedIds(checked ? Array.from(new Set([...selectedIds, ...visibleStudents.map((student) => student.id)])) : selectedIds.filter((id) => !visibleStudents.some((student) => student.id === id)));
   const resetFilters = () => { setSearch(""); setSection("Secondaire"); setLevel("Tous"); setClassFilter("Toutes"); setStatus("Actif"); setRegistration("Toutes"); setPage(1); };
   const refresh = () => { setIsLoading(true); window.setTimeout(() => { setIsLoading(false); onToast("Liste actualisée", "Les inscriptions de l’année 2026-2027 ont été synchronisées."); }, 650); };
+  const importRows = (rows: CsvStudentRow[]) => {
+    const newStudents = rows.map((row, index) => ({ id: `import-${Date.now()}-${index}`, matricule: `STU-${String(152 + importedStudents.length + index).padStart(6, "0")}`, fullName: `${row.firstName} ${row.lastName}`, initials: `${row.firstName.charAt(0)}${row.lastName.charAt(0)}`.toUpperCase(), sex: row.sex, className: row.className, level: row.className.split(" ")[0] ?? "", registrationType: row.registrationType, status: "Actif" as const, balance: 0, birthDate: "À compléter", parent: "À compléter", phone: row.parentPhone, enrollmentDate: "27 août 2026", documents: 0 }));
+    setImportedStudents((current) => [...newStudents, ...current]);
+    if (newStudents[0]) setSelectedStudentId(newStudents[0].id);
+    setPage(1);
+  };
 
   return (
     <section className="student-management" aria-label="Gestion des élèves">
       <header className="student-page-heading">
         <div><p className="eyebrow">Scolarité · registre annuel</p><h1>Élèves</h1><p>Recherchez une identité élève et pilotez son inscription pour l’année scolaire en cours.</p></div>
-        <div className="student-header-actions"><div className="student-context"><span>Année scolaire : <strong>2026-2027</strong></span><span>Section : <strong>{section}</strong></span></div><Button className="primary-action" onClick={() => setStudentModal(true)}><Plus size={16} /> Ajouter un élève</Button></div>
+        <div className="student-header-actions"><div className="student-context"><span>Année scolaire : <strong>2026-2027</strong></span><span>Section : <strong>{section}</strong></span></div><Button variant="outline" className="secondary-action" onClick={() => setImportModal(true)}><Upload size={16} /> Importer CSV</Button><Button className="primary-action" onClick={() => setStudentModal(true)}><Plus size={16} /> Ajouter un élève</Button></div>
       </header>
 
       <section className="identity-enrollment-notice"><span className="notice-number">01</span><div><strong>Identité élève et inscription annuelle sont distinctes.</strong><p>Le matricule, l’état civil et les responsables légaux appartiennent au dossier permanent. La classe, le type d’inscription, le statut et le solde correspondent à l’année 2026-2027.</p></div><FileText size={20} /></section>
@@ -143,6 +154,7 @@ export function StudentManagement({ onToast, onSuccess }: { onToast: (title: str
         <aside className="student-summary" aria-label="Synthèse de l’élève sélectionné">{selectedStudent ? <><div className="summary-heading"><div><p className="eyebrow">Élève sélectionné</p><h2>Synthèse du dossier</h2></div><UserRound size={18} /></div><div className="summary-person"><span className={`student-photo student-photo-${selectedStudent.sex.toLowerCase()}`}>{selectedStudent.initials}</span><div><strong>{selectedStudent.fullName}</strong><small>{selectedStudent.matricule}</small></div></div><div className="summary-section"><p>Identité permanente</p><dl><div><dt>Date de naissance</dt><dd>{selectedStudent.birthDate}</dd></div><div><dt>Responsable légal</dt><dd>{selectedStudent.parent}</dd></div><div><dt>Contact</dt><dd>{selectedStudent.phone}</dd></div></dl></div><div className="summary-section annual"><p>Inscription 2026-2027</p><dl><div><dt>Classe actuelle</dt><dd>{selectedStudent.className}</dd></div><div><dt>Type</dt><dd>{selectedStudent.registrationType}</dd></div><div><dt>Statut</dt><dd><StatusBadge status={selectedStudent.status} /></dd></div><div><dt>Solde</dt><dd className={selectedStudent.balance > 100000 ? "balance balance-high" : "balance"}>{selectedStudent.balance === 0 ? "À jour" : `${selectedStudent.balance.toLocaleString("fr-FR")} CDF`}</dd></div></dl></div><div className="summary-documents"><FileText size={16} /><span><strong>{selectedStudent.documents} documents au dossier</strong><small>Inscription enregistrée le {selectedStudent.enrollmentDate}</small></span></div><div className="summary-actions"><button onClick={() => onToast("Dossier élève", `Ouverture du dossier permanent de ${selectedStudent.fullName}.`)}><Eye size={15} /> Voir le dossier</button><button onClick={() => onToast("Finances", `La situation financière de ${selectedStudent.fullName} est prête à être consultée.`)}><WalletCards size={15} /> Voir les finances</button></div></> : <div className="summary-empty"><CircleAlert size={22} /><h3>Aucun élève sélectionné</h3><p>Sélectionnez une ligne du registre pour afficher la synthèse de son dossier.</p></div>}</aside>
       </section>
       <QuickActionModal action={studentModal ? "student" : null} onClose={() => setStudentModal(false)} onSuccess={onSuccess} />
+      <StudentCsvImportModal open={importModal} onClose={() => setImportModal(false)} onImport={importRows} onSuccess={onSuccess} />
     </section>
   );
 }
