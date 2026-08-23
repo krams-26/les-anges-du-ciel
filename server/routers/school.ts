@@ -16,6 +16,7 @@ import {
   users,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { assertPermission } from "../permissions";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 
 const sex = z.enum(["F", "M"]);
@@ -74,7 +75,8 @@ async function database() {
 export const schoolRouter = router({
   years: router({
     list: protectedProcedure.query(async () => (await database()).select().from(academicYears).orderBy(asc(academicYears.startsAt))),
-    create: adminProcedure.input(z.object({ code: z.string().trim().regex(/^\d{4}-\d{4}$/), label: z.string().trim().min(5).max(32), startsAt: z.coerce.date(), endsAt: z.coerce.date() })).mutation(async ({ input }) => {
+    create: adminProcedure.input(z.object({ code: z.string().trim().regex(/^\d{4}-\d{4}$/), label: z.string().trim().min(5).max(32), startsAt: z.coerce.date(), endsAt: z.coerce.date() })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "settings", "edit");
       if (input.endsAt <= input.startsAt) throw new TRPCError({ code: "BAD_REQUEST", message: "La fin de l’année doit être postérieure à son début." });
       const db = await database();
       await db.insert(academicYears).values({ ...input, status: "draft" });
@@ -82,12 +84,14 @@ export const schoolRouter = router({
     }),
   }),
   students: router({
-    list: adminProcedure.input(z.object({ academicYearId: z.number().int().positive().optional(), search: z.string().trim().max(120).optional() }).optional()).query(async ({ input }) => {
+    list: adminProcedure.input(z.object({ academicYearId: z.number().int().positive().optional(), search: z.string().trim().max(120).optional() }).optional()).query(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "students", "view");
       const db = await database();
       const base = db.select({ id: students.id, studentCode: students.studentCode, lastName: students.lastName, firstName: students.firstName, sex: students.sex, status: students.status }).from(students).orderBy(asc(students.lastName), asc(students.firstName));
       return base;
     }),
-    create: adminProcedure.input(schoolInputs.studentCreate).mutation(async ({ input }) => {
+    create: adminProcedure.input(schoolInputs.studentCreate).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "students", "create");
       const db = await database();
       const exists = await db.select({ id: students.id }).from(students).where(eq(students.studentCode, input.studentCode)).limit(1);
       if (exists.length) throw new TRPCError({ code: "CONFLICT", message: "Ce matricule existe déjà." });
@@ -98,7 +102,8 @@ export const schoolRouter = router({
       await db.insert(guardians).values(input.guardians.map((guardian) => ({ studentId: student.id, fullName: guardian.fullName, relationship: guardian.relationship, phone: guardian.phone, isPrimary: guardian.isPrimary, receivesCommunications: guardian.receivesCommunications, canViewResults: guardian.canViewResults, canMakePayments: guardian.canMakePayments })));
       return { studentId: student.id, studentCode: input.studentCode };
     }),
-    bulkCreate: adminProcedure.input(schoolInputs.studentBulkCreate).mutation(async ({ input }) => {
+    bulkCreate: adminProcedure.input(schoolInputs.studentBulkCreate).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "students", "create");
       const db = await database();
       const uniqueCodes = new Set(input.rows.map((row) => row.studentCode));
       if (uniqueCodes.size !== input.rows.length) throw new TRPCError({ code: "BAD_REQUEST", message: "Le fichier contient des matricules dupliqués." });
@@ -119,7 +124,8 @@ export const schoolRouter = router({
     }),
   }),
   enrollments: router({
-    createForStudent: adminProcedure.input(z.object({ studentId: z.number().int().positive(), academicYearId: z.number().int().positive(), classId: z.number().int().positive().optional(), enrollmentType })).mutation(async ({ input }) => {
+    createForStudent: adminProcedure.input(z.object({ studentId: z.number().int().positive(), academicYearId: z.number().int().positive(), classId: z.number().int().positive().optional(), enrollmentType })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "enrollments", "create");
       const db = await database();
       const existing = await db.select({ id: enrollments.id }).from(enrollments).where(and(eq(enrollments.studentId, input.studentId), eq(enrollments.academicYearId, input.academicYearId))).limit(1);
       if (existing.length) throw new TRPCError({ code: "CONFLICT", message: "Cet élève possède déjà une inscription dans cette année scolaire." });
@@ -128,24 +134,26 @@ export const schoolRouter = router({
     }),
   }),
   classes: router({
-    list: adminProcedure.input(z.object({ academicYearId: z.number().int().positive() })).query(async ({ input }) => (await database()).select().from(classes).where(eq(classes.academicYearId, input.academicYearId)).orderBy(asc(classes.level), asc(classes.name))),
-    create: adminProcedure.input(schoolInputs.classCreate).mutation(async ({ input }) => { const db = await database(); await db.insert(classes).values({ ...input, status: "draft" }); return { ok: true }; }),
+    list: adminProcedure.input(z.object({ academicYearId: z.number().int().positive() })).query(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "enrollments", "view"); return (await database()).select().from(classes).where(eq(classes.academicYearId, input.academicYearId)).orderBy(asc(classes.level), asc(classes.name)); }),
+    create: adminProcedure.input(schoolInputs.classCreate).mutation(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "enrollments", "create"); const db = await database(); await db.insert(classes).values({ ...input, status: "draft" }); return { ok: true }; }),
   }),
   courses: router({
-    list: adminProcedure.query(async () => (await database()).select().from(courses).orderBy(asc(courses.name))),
-    create: adminProcedure.input(schoolInputs.courseCreate).mutation(async ({ input }) => { const db = await database(); await db.insert(courses).values(input); return { ok: true }; }),
-    configure: adminProcedure.input(schoolInputs.classCourseCreate).mutation(async ({ input }) => { const db = await database(); await db.insert(classCourses).values(input); return { ok: true }; }),
-    configured: adminProcedure.input(z.object({ classId: z.number().int().positive() })).query(async ({ input }) => {
+    list: adminProcedure.query(async ({ ctx }) => { await assertPermission(ctx.user.id, "settings", "view"); return (await database()).select().from(courses).orderBy(asc(courses.name)); }),
+    create: adminProcedure.input(schoolInputs.courseCreate).mutation(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "settings", "edit"); const db = await database(); await db.insert(courses).values(input); return { ok: true }; }),
+    configure: adminProcedure.input(schoolInputs.classCourseCreate).mutation(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "settings", "edit"); const db = await database(); await db.insert(classCourses).values(input); return { ok: true }; }),
+    configured: adminProcedure.input(z.object({ classId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "settings", "view");
       const db = await database();
       return db.select({ id: classCourses.id, courseId: courses.id, courseName: courses.name, courseCode: courses.code, periodWeight: classCourses.periodWeight, status: classCourses.status }).from(classCourses).innerJoin(courses, eq(classCourses.courseId, courses.id)).where(eq(classCourses.classId, input.classId)).orderBy(asc(courses.name));
     }),
-    updateWeight: adminProcedure.input(z.object({ classCourseId: z.number().int().positive(), periodWeight: z.number().int().min(1).max(100) })).mutation(async ({ input }) => { const db = await database(); await db.update(classCourses).set({ periodWeight: input.periodWeight }).where(eq(classCourses.id, input.classCourseId)); return { ok: true }; }),
+    updateWeight: adminProcedure.input(z.object({ classCourseId: z.number().int().positive(), periodWeight: z.number().int().min(1).max(100) })).mutation(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "settings", "edit"); const db = await database(); await db.update(classCourses).set({ periodWeight: input.periodWeight }).where(eq(classCourses.id, input.classCourseId)); return { ok: true }; }),
   }),
   teachers: router({
-    list: adminProcedure.query(async () => (await database()).select().from(teachers).orderBy(asc(teachers.fullName))),
-    create: adminProcedure.input(schoolInputs.teacherCreate).mutation(async ({ input }) => { const db = await database(); await db.insert(teachers).values({ ...input, phone: input.phone || null, email: input.email || null, specialties: input.specialties || null }); return { ok: true }; }),
-    linkableUsers: adminProcedure.query(async () => (await database()).select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(eq(users.role, "user")).orderBy(asc(users.name))),
-    linkAccount: adminProcedure.input(z.object({ teacherId: z.number().int().positive(), userId: z.number().int().positive() })).mutation(async ({ input }) => {
+    list: adminProcedure.query(async ({ ctx }) => { await assertPermission(ctx.user.id, "users", "view"); return (await database()).select().from(teachers).orderBy(asc(teachers.fullName)); }),
+    create: adminProcedure.input(schoolInputs.teacherCreate).mutation(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "users", "edit"); const db = await database(); await db.insert(teachers).values({ ...input, phone: input.phone || null, email: input.email || null, specialties: input.specialties || null }); return { ok: true }; }),
+    linkableUsers: adminProcedure.query(async ({ ctx }) => { await assertPermission(ctx.user.id, "users", "view"); return (await database()).select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(eq(users.role, "user")).orderBy(asc(users.name)); }),
+    linkAccount: adminProcedure.input(z.object({ teacherId: z.number().int().positive(), userId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "users", "edit");
       const db = await database();
       const [teacher] = await db.select({ id: teachers.id }).from(teachers).where(eq(teachers.id, input.teacherId)).limit(1);
       if (!teacher) throw new TRPCError({ code: "NOT_FOUND", message: "La fiche enseignant est introuvable." });

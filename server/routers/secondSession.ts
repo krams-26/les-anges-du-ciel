@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { academicYears, auditEvents, classCourses, classes, courses, deliberationAudits, deliberationDecisions, deliberationSessions, enrollments, grades, secondSessionAssessments, secondSessionCandidates, secondSessionSettings, students, users } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { assertPermission } from "../permissions";
 import { adminProcedure, router } from "../_core/trpc";
 
 async function database() {
@@ -20,8 +21,9 @@ export const canValidateDeliberation = (status: "draft" | "proposed" | "validate
 
 export const secondSessionRouter = router({
   settings: router({
-    list: adminProcedure.query(async () => (await database()).select({ id: secondSessionSettings.id, academicYearId: secondSessionSettings.academicYearId, academicYear: academicYears.label, eligibilityMode: secondSessionSettings.eligibilityMode, thresholdPercent: secondSessionSettings.thresholdPercent, registrationDeadline: secondSessionSettings.registrationDeadline, examStartsAt: secondSessionSettings.examStartsAt, examEndsAt: secondSessionSettings.examEndsAt, status: secondSessionSettings.status }).from(secondSessionSettings).innerJoin(academicYears, eq(secondSessionSettings.academicYearId, academicYears.id)).orderBy(desc(secondSessionSettings.updatedAt))),
+    list: adminProcedure.query(async ({ ctx }) => { await assertPermission(ctx.user.id, "settings", "view"); return (await database()).select({ id: secondSessionSettings.id, academicYearId: secondSessionSettings.academicYearId, academicYear: academicYears.label, eligibilityMode: secondSessionSettings.eligibilityMode, thresholdPercent: secondSessionSettings.thresholdPercent, registrationDeadline: secondSessionSettings.registrationDeadline, examStartsAt: secondSessionSettings.examStartsAt, examEndsAt: secondSessionSettings.examEndsAt, status: secondSessionSettings.status }).from(secondSessionSettings).innerJoin(academicYears, eq(secondSessionSettings.academicYearId, academicYears.id)).orderBy(desc(secondSessionSettings.updatedAt)); }),
     save: adminProcedure.input(z.object({ id: z.number().int().positive().optional(), academicYearId: z.number().int().positive(), eligibilityMode: z.enum(["below_average", "unvalidated", "manual"]), thresholdPercent: z.number().int().min(0).max(100), registrationDeadline: dateInput, examStartsAt: dateInput, examEndsAt: dateInput, status: z.enum(["draft", "open", "closed", "archived"]) })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "settings", "edit");
       const db = await database();
       const values = { academicYearId: input.academicYearId, eligibilityMode: input.eligibilityMode, thresholdPercent: input.thresholdPercent, registrationDeadline: input.registrationDeadline ?? null, examStartsAt: input.examStartsAt ?? null, examEndsAt: input.examEndsAt ?? null, status: input.status };
       if (input.id) {
@@ -37,8 +39,9 @@ export const secondSessionRouter = router({
     }),
   }),
   candidates: router({
-    list: adminProcedure.input(z.object({ settingId: z.number().int().positive() })).query(async ({ input }) => (await database()).select({ id: secondSessionCandidates.id, enrollmentId: secondSessionCandidates.enrollmentId, status: secondSessionCandidates.status, calculatedAverage: secondSessionCandidates.calculatedAverage, eligibilityReason: secondSessionCandidates.eligibilityReason, studentName: students.firstName, studentLastName: students.lastName, studentCode: students.studentCode, className: classes.name }).from(secondSessionCandidates).innerJoin(enrollments, eq(secondSessionCandidates.enrollmentId, enrollments.id)).innerJoin(students, eq(enrollments.studentId, students.id)).innerJoin(classes, eq(enrollments.classId, classes.id)).where(eq(secondSessionCandidates.secondSessionSettingId, input.settingId)).orderBy(asc(classes.name), asc(students.lastName), asc(students.firstName))),
+    list: adminProcedure.input(z.object({ settingId: z.number().int().positive() })).query(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "results", "view"); return (await database()).select({ id: secondSessionCandidates.id, enrollmentId: secondSessionCandidates.enrollmentId, status: secondSessionCandidates.status, calculatedAverage: secondSessionCandidates.calculatedAverage, eligibilityReason: secondSessionCandidates.eligibilityReason, studentName: students.firstName, studentLastName: students.lastName, studentCode: students.studentCode, className: classes.name }).from(secondSessionCandidates).innerJoin(enrollments, eq(secondSessionCandidates.enrollmentId, enrollments.id)).innerJoin(students, eq(enrollments.studentId, students.id)).innerJoin(classes, eq(enrollments.classId, classes.id)).where(eq(secondSessionCandidates.secondSessionSettingId, input.settingId)).orderBy(asc(classes.name), asc(students.lastName), asc(students.firstName)); }),
     evaluate: adminProcedure.input(z.object({ settingId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "results", "validate");
       const db = await database();
       const [setting] = await db.select().from(secondSessionSettings).where(eq(secondSessionSettings.id, input.settingId)).limit(1);
       if (!setting) throw new TRPCError({ code: "NOT_FOUND", message: "Configuration de deuxième session introuvable." });
@@ -58,6 +61,7 @@ export const secondSessionRouter = router({
       return { processed };
     }),
     setStatus: adminProcedure.input(z.object({ candidateId: z.number().int().positive(), status: z.enum(["eligible", "registered", "exempt", "ineligible", "withdrawn"]), reason: z.string().trim().min(3).max(1000) })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "results", "validate");
       const db = await database();
       await db.update(secondSessionCandidates).set({ status: input.status, eligibilityReason: input.reason, decidedByUserId: ctx.user.id, decidedAt: new Date() }).where(eq(secondSessionCandidates.id, input.candidateId));
       await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "second_session_candidate_updated", module: "second_session", resourceType: "candidate", resourceId: input.candidateId, afterState: JSON.stringify(input), reason: input.reason });
@@ -66,13 +70,15 @@ export const secondSessionRouter = router({
   }),
   assessments: router({
     save: adminProcedure.input(secondSessionInputs.assessment).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "grades", "edit");
       const db = await database();
       await db.insert(secondSessionAssessments).values({ ...input, enteredByUserId: ctx.user.id, submittedAt: input.status === "draft" ? null : new Date() }).onDuplicateKeyUpdate({ set: { score: input.score, maximum: input.maximum, status: input.status, enteredByUserId: ctx.user.id, submittedAt: input.status === "draft" ? null : new Date() } });
       await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "second_session_assessment_saved", module: "second_session", resourceType: "candidate", resourceId: input.candidateId, afterState: JSON.stringify(input) });
       return { ok: true };
     }),
-    summary: adminProcedure.input(z.object({ candidateId: z.number().int().positive() })).query(async ({ input }) => (await database()).select().from(secondSessionAssessments).where(eq(secondSessionAssessments.candidateId, input.candidateId))),
-    context: adminProcedure.input(z.object({ candidateId: z.number().int().positive() })).query(async ({ input }) => {
+    summary: adminProcedure.input(z.object({ candidateId: z.number().int().positive() })).query(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "results", "view"); return (await database()).select().from(secondSessionAssessments).where(eq(secondSessionAssessments.candidateId, input.candidateId)); }),
+    context: adminProcedure.input(z.object({ candidateId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "results", "view");
       const db = await database();
       const [candidate] = await db.select({ id: secondSessionCandidates.id, enrollmentId: secondSessionCandidates.enrollmentId, firstSessionAverage: secondSessionCandidates.calculatedAverage, classId: enrollments.classId }).from(secondSessionCandidates).innerJoin(enrollments, eq(secondSessionCandidates.enrollmentId, enrollments.id)).where(eq(secondSessionCandidates.id, input.candidateId)).limit(1);
       if (!candidate) throw new TRPCError({ code: "NOT_FOUND", message: "Candidat de deuxième session introuvable." });
@@ -83,8 +89,9 @@ export const secondSessionRouter = router({
     }),
   }),
   deliberation: router({
-    sessions: adminProcedure.input(z.object({ academicYearId: z.number().int().positive() })).query(async ({ input }) => (await database()).select().from(deliberationSessions).where(eq(deliberationSessions.academicYearId, input.academicYearId)).orderBy(desc(deliberationSessions.updatedAt))),
+    sessions: adminProcedure.input(z.object({ academicYearId: z.number().int().positive() })).query(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "results", "view"); return (await database()).select().from(deliberationSessions).where(eq(deliberationSessions.academicYearId, input.academicYearId)).orderBy(desc(deliberationSessions.updatedAt)); }),
     createSession: adminProcedure.input(z.object({ academicYearId: z.number().int().positive(), label: z.string().trim().min(3).max(120) })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "results", "validate");
       const db = await database();
       await db.insert(deliberationSessions).values({ ...input, createdByUserId: ctx.user.id });
       const [session] = await db.select({ id: deliberationSessions.id }).from(deliberationSessions).where(and(eq(deliberationSessions.academicYearId, input.academicYearId), eq(deliberationSessions.label, input.label))).limit(1);
@@ -93,6 +100,7 @@ export const secondSessionRouter = router({
       return session;
     }),
     initialize: adminProcedure.input(z.object({ sessionId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "results", "validate");
       const db = await database();
       const [session] = await db.select().from(deliberationSessions).where(eq(deliberationSessions.id, input.sessionId)).limit(1);
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session de délibération introuvable." });
@@ -107,8 +115,9 @@ export const secondSessionRouter = router({
       await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "deliberation_decisions_initialized", module: "deliberation", resourceType: "session", resourceId: session.id, afterState: JSON.stringify({ enrollments: activeEnrollments.length }) });
       return { initialized: activeEnrollments.length };
     }),
-    decisions: adminProcedure.input(z.object({ sessionId: z.number().int().positive() })).query(async ({ input }) => (await database()).select({ id: deliberationDecisions.id, enrollmentId: deliberationDecisions.enrollmentId, decision: deliberationDecisions.decision, basis: deliberationDecisions.basis, finalAverage: deliberationDecisions.finalAverage, rationale: deliberationDecisions.rationale, status: deliberationDecisions.status, studentName: students.firstName, studentLastName: students.lastName, studentCode: students.studentCode, className: classes.name }).from(deliberationDecisions).innerJoin(enrollments, eq(deliberationDecisions.enrollmentId, enrollments.id)).innerJoin(students, eq(enrollments.studentId, students.id)).innerJoin(classes, eq(enrollments.classId, classes.id)).where(eq(deliberationDecisions.deliberationSessionId, input.sessionId)).orderBy(asc(classes.name), asc(students.lastName))),
+    decisions: adminProcedure.input(z.object({ sessionId: z.number().int().positive() })).query(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "results", "view"); return (await database()).select({ id: deliberationDecisions.id, enrollmentId: deliberationDecisions.enrollmentId, decision: deliberationDecisions.decision, basis: deliberationDecisions.basis, finalAverage: deliberationDecisions.finalAverage, rationale: deliberationDecisions.rationale, status: deliberationDecisions.status, studentName: students.firstName, studentLastName: students.lastName, studentCode: students.studentCode, className: classes.name }).from(deliberationDecisions).innerJoin(enrollments, eq(deliberationDecisions.enrollmentId, enrollments.id)).innerJoin(students, eq(enrollments.studentId, students.id)).innerJoin(classes, eq(enrollments.classId, classes.id)).where(eq(deliberationDecisions.deliberationSessionId, input.sessionId)).orderBy(asc(classes.name), asc(students.lastName)); }),
     propose: adminProcedure.input(z.object({ sessionId: z.number().int().positive(), enrollmentId: z.number().int().positive(), decision: decisionEnum, basis: z.enum(["first_session", "second_session", "manual"]), finalAverage: z.number().int().min(0).max(100).nullable(), rationale: z.string().trim().min(3).max(1500) })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "results", "validate");
       const db = await database();
       const [previous] = await db.select().from(deliberationDecisions).where(and(eq(deliberationDecisions.deliberationSessionId, input.sessionId), eq(deliberationDecisions.enrollmentId, input.enrollmentId))).limit(1);
       await db.insert(deliberationDecisions).values({ deliberationSessionId: input.sessionId, enrollmentId: input.enrollmentId, decision: input.decision, basis: input.basis, finalAverage: input.finalAverage, rationale: input.rationale, status: "proposed", proposedByUserId: ctx.user.id, proposedAt: new Date() }).onDuplicateKeyUpdate({ set: { decision: input.decision, basis: input.basis, finalAverage: input.finalAverage, rationale: input.rationale, status: "proposed", proposedByUserId: ctx.user.id, proposedAt: new Date(), validatedByUserId: null, validatedAt: null } });
@@ -118,6 +127,7 @@ export const secondSessionRouter = router({
       return saved;
     }),
     validate: adminProcedure.input(z.object({ decisionId: z.number().int().positive(), reason: z.string().trim().min(3).max(1500) })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "results", "validate");
       const db = await database();
       const [previous] = await db.select().from(deliberationDecisions).where(eq(deliberationDecisions.id, input.decisionId)).limit(1);
       if (!previous || !canValidateDeliberation(previous.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "Seule une décision proposée peut être validée." });
@@ -127,6 +137,7 @@ export const secondSessionRouter = router({
       return { ok: true };
     }),
     rectify: adminProcedure.input(z.object({ decisionId: z.number().int().positive(), decision: decisionEnum, basis: z.enum(["first_session", "second_session", "manual"]), finalAverage: z.number().int().min(0).max(100).nullable(), rationale: z.string().trim().min(3).max(1500) })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "results", "validate");
       const db = await database();
       const [previous] = await db.select().from(deliberationDecisions).where(eq(deliberationDecisions.id, input.decisionId)).limit(1);
       if (!previous || previous.status !== "validated") throw new TRPCError({ code: "BAD_REQUEST", message: "Seule une décision validée peut être rectifiée." });
@@ -135,6 +146,6 @@ export const secondSessionRouter = router({
       await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "deliberation_decision_rectified", module: "deliberation", resourceType: "decision", resourceId: input.decisionId, reason: input.rationale });
       return { ok: true };
     }),
-    history: adminProcedure.input(z.object({ decisionId: z.number().int().positive() })).query(async ({ input }) => (await database()).select({ id: deliberationAudits.id, action: deliberationAudits.action, previousState: deliberationAudits.previousState, nextState: deliberationAudits.nextState, reason: deliberationAudits.reason, createdAt: deliberationAudits.createdAt, actorName: users.name }).from(deliberationAudits).leftJoin(users, eq(deliberationAudits.actorUserId, users.id)).where(eq(deliberationAudits.deliberationDecisionId, input.decisionId)).orderBy(desc(deliberationAudits.createdAt))),
+    history: adminProcedure.input(z.object({ decisionId: z.number().int().positive() })).query(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "audit", "view"); return (await database()).select({ id: deliberationAudits.id, action: deliberationAudits.action, previousState: deliberationAudits.previousState, nextState: deliberationAudits.nextState, reason: deliberationAudits.reason, createdAt: deliberationAudits.createdAt, actorName: users.name }).from(deliberationAudits).leftJoin(users, eq(deliberationAudits.actorUserId, users.id)).where(eq(deliberationAudits.deliberationDecisionId, input.decisionId)).orderBy(desc(deliberationAudits.createdAt)); }),
   }),
 });

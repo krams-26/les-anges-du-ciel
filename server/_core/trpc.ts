@@ -1,6 +1,9 @@
 import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
+import { eq } from "drizzle-orm";
 import superjson from "superjson";
+import { users } from "../../drizzle/schema";
+import { getDb } from "../db";
 import type { TrpcContext } from "./context";
 
 const t = initTRPC.context<TrpcContext>().create({
@@ -17,6 +20,14 @@ const requireUser = t.middleware(async opts => {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
+  const db = await getDb();
+  if (db) {
+    const [account] = await db.select({ accountStatus: users.accountStatus }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
+    if (account && account.accountStatus !== "active") {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Ce compte n’est pas actif. Veuillez contacter l’administration." });
+    }
+  }
+
   return next({
     ctx: {
       ...ctx,
@@ -27,7 +38,7 @@ const requireUser = t.middleware(async opts => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
-export const adminProcedure = t.procedure.use(
+export const adminProcedure = protectedProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
