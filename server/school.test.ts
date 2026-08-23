@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import { schoolInputs } from "./routers/school";
+import { canAccessAssignment, teachingInputs } from "./routers/teaching";
 import type { TrpcContext } from "./_core/context";
 
 describe("validations des opérations scolaires", () => {
@@ -37,5 +37,25 @@ describe("validations des opérations scolaires", () => {
     };
     const caller = appRouter.createCaller(ctx);
     await expect(caller.school.courses.create({ code: "GEO", name: "Géographie", section: "Secondaire", levels: "7e" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("refuse une note négative ou supérieure au maximum", () => {
+    const base = { assignmentId: 1, periodId: 1, scores: [{ enrollmentId: 1, score: 8, maximum: 10 }] };
+    expect(teachingInputs.grades.parse(base).scores[0]?.score).toBe(8);
+    expect(() => teachingInputs.grades.parse({ ...base, scores: [{ enrollmentId: 1, score: -1, maximum: 10 }] })).toThrow();
+    expect(() => teachingInputs.grades.parse({ ...base, scores: [{ enrollmentId: 1, score: 11, maximum: 10 }] })).toThrow();
+  });
+
+  it("n’accepte que les statuts de présence réglementaires", () => {
+    const base = { assignmentId: 1, sessionDate: new Date("2026-08-23"), records: [{ enrollmentId: 1, status: "present" }] };
+    expect(teachingInputs.attendance.parse(base).records[0]?.status).toBe("present");
+    expect(() => teachingInputs.attendance.parse({ ...base, records: [{ enrollmentId: 1, status: "missing" }] })).toThrow();
+  });
+
+  it("refuse l’affectation d’un enseignant liée à un autre compte", () => {
+    expect(canAccessAssignment("user", 17, 17)).toBe(true);
+    expect(canAccessAssignment("user", 17, 18)).toBe(false);
+    expect(canAccessAssignment("user", null, 18)).toBe(false);
+    expect(canAccessAssignment("admin", null, 18)).toBe(true);
   });
 });
