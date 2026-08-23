@@ -45,9 +45,9 @@
 
 ## Suivi — Extension des modules administratifs
 
-- [ ] Définir l’ordre de réalisation des modules décrits dans le brief.
-- [ ] Concevoir et intégrer les prochains écrans administratifs retenus.
-- [ ] Vérifier les parcours et enregistrer la prochaine livraison.
+- [x] Définir l’ordre de réalisation des modules décrits dans le brief.
+- [x] Concevoir et intégrer les prochains écrans administratifs retenus.
+- [x] Vérifier les parcours et enregistrer la prochaine livraison.
 
 ## Suivi — Inscription / Réinscription
 
@@ -82,3 +82,14 @@
 - [ ] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
 - [ ] Exécuter les parcours d’écriture de bout en bout avec un compte administrateur de test.
 - [x] Documenter la compatibilité de déploiement Vercel et enregistrer la livraison.
+
+## Suivi — Parcours enseignants
+
+- [x] Modéliser les affectations, présences, critères d’évaluation et notes par période.
+- [x] Ajouter le tableau de bord et l’espace « Mes enseignements » réservés à l’enseignant.
+- [x] Ajouter l’appel mobile, l’historique, les évaluations et les saisies de notes.
+- [ ] Contrôler les permissions par affectation, les validations et les états réseau.
+- [ ] Vérifier les vues desktop et mobile puis enregistrer la livraison.
+- [ ] Supprimer le basculement manuel de rôle et protéger strictement les vues enseignants par session authentifiée.
+- [ ] Rediriger les actions enseignants vers les vues pédagogiques autorisées, sans exposer le registre administratif global.
+- [ ] Corriger les options d’évaluation et valider complètement les notes avec des messages d’erreur de champ.

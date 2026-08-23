@@ -10,6 +10,7 @@ import { EnrollmentWizard } from "@/components/EnrollmentWizard";
 import { ClassManagement } from "@/components/ClassManagement";
 import { ClassWorkspace } from "@/components/ClassWorkspace";
 import { AssignmentManagement, CourseCatalog, ExcelStudentImport, NewYearPreparation, TeacherManagement, TeacherProfile, WeightConfiguration } from "@/components/AcademicModules";
+import { TeacherSuite } from "@/components/TeacherSuite";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -107,6 +108,7 @@ const navGroups: NavGroup[] = [
   {
     label: "Pédagogie",
     items: [
+      { label: "Mes enseignements", icon: BookOpen, roles: ["teacher"] },
       { label: "Présences", icon: ClipboardCheck, roles: ["admin", "teacher"] },
       { label: "Évaluations", icon: FileText, roles: ["admin", "teacher"] },
       { label: "Notes", icon: BarChart3, roles: ["admin", "teacher"] },
@@ -254,11 +256,11 @@ function WorkspacePlaceholder({ activeNav, onAction }: { activeNav: string; onAc
 }
 
 export default function Home() {
-  const [role, setRole] = useState<Role>("admin");
   const { user, loading, isAuthenticated, logout } = useAuth();
+  const role: Role = user?.role === "admin" ? "admin" : "teacher";
   const [activeNav, setActiveNav] = useState(() => {
     const view = new URLSearchParams(window.location.search).get("vue");
-    return view === "administrateur" ? "Vue administrateur" : view === "eleves" ? "Élèves" : view === "profil-eleve" ? "Profil élève" : view === "inscription" ? "Inscription / Réinscription" : view === "classes" ? "Classes" : view === "classe-7a" ? "Espace de classe" : view === "cours" ? "Cours" : view === "ponderations" ? "Cours et pondérations" : view === "enseignants" ? "Enseignants" : view === "profil-enseignant" ? "Profil enseignant" : view === "affectations" ? "Affectations" : view === "annees" ? "Années scolaires" : view === "import-eleves" ? "Importer les élèves" : "Tableau de bord";
+    return view === "administrateur" ? "Vue administrateur" : view === "eleves" ? "Élèves" : view === "profil-eleve" ? "Profil élève" : view === "inscription" ? "Inscription / Réinscription" : view === "classes" ? "Classes" : view === "classe-7a" ? "Espace de classe" : view === "cours" ? "Cours" : view === "ponderations" ? "Cours et pondérations" : view === "enseignants" ? "Enseignants" : view === "profil-enseignant" ? "Profil enseignant" : view === "affectations" ? "Affectations" : view === "annees" ? "Années scolaires" : view === "import-eleves" ? "Importer les élèves" : view === "enseignements" ? "Mes enseignements" : view === "appel" ? "Faire l’appel" : view === "historique-presences" ? "Historique des présences" : view === "evaluations-enseignant" ? "Évaluations enseignant" : view === "saisie-notes" ? "Saisie des notes" : view === "saisie-examen" ? "Saisie examen" : view === "rapport-enseignant" ? "Rapport enseignant" : view === "suivi-saisies" ? "Suivi des saisies" : view === "validation-notes" ? "Validation des notes" : view === "releve-cotes" ? "Relevé de côtes" : view === "resultats-classe" ? "Résultats classe" : view === "resultats-eleve" ? "Résultats élève" : "Tableau de bord";
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -269,11 +271,6 @@ export default function Home() {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [academicYear, setAcademicYear] = useState("2026-2027");
 
-  useEffect(() => {
-    if (user?.role === "admin") setRole("admin");
-    if (user?.role === "user") setRole("teacher");
-  }, [user?.role]);
-
   const visibleGroups = useMemo(
     () => navGroups
       .map((group) => ({ ...group, items: group.items.filter((item) => item.roles.includes(role)) }))
@@ -283,7 +280,7 @@ export default function Home() {
 
   useEffect(() => {
     const stillVisible = visibleGroups.some((group) => group.items.some((item) => item.label === activeNav));
-    if (!stillVisible && !["Profil élève", "Espace de classe", "Cours et pondérations", "Profil enseignant"].includes(activeNav)) setActiveNav("Tableau de bord");
+    if (!stillVisible && !["Profil élève", "Espace de classe", "Cours et pondérations", "Profil enseignant", "Élèves de la classe", "Faire l’appel", "Historique des présences", "Évaluations enseignant", "Saisie des notes", "Saisie examen", "Rapport enseignant", "Suivi des saisies", "Validation des notes", "Relevé de côtes", "Résultats classe", "Résultats élève"].includes(activeNav)) setActiveNav("Tableau de bord");
   }, [activeNav, visibleGroups]);
 
   useEffect(() => {
@@ -316,6 +313,8 @@ export default function Home() {
   const isClasses = activeNav === "Classes";
   const isClassWorkspace = activeNav === "Espace de classe";
   const isAcademicSuite = ["Cours", "Cours et pondérations", "Enseignants", "Profil enseignant", "Affectations", "Années scolaires", "Importer les élèves"].includes(activeNav);
+  const isTeacherSuite = ["Mes enseignements", "Élèves de la classe", "Faire l’appel", "Historique des présences", "Évaluations enseignant", "Saisie des notes", "Saisie examen", "Rapport enseignant", "Suivi des saisies", "Validation des notes", "Relevé de côtes", "Résultats classe", "Résultats élève"].includes(activeNav) || role === "teacher";
+  const isAdminTeachingView = ["Suivi des saisies", "Validation des notes", "Résultats classe"].includes(activeNav);
 
   if (loading) return <div className="auth-gate"><CrestMark /><div className="auth-gate-card"><ShieldCheck size={22} /><h1>Vérification de l’accès</h1><p>Préparation de votre environnement de gestion scolaire sécurisé.</p></div></div>;
   if (!isAuthenticated) return <div className="auth-gate"><CrestMark /><div className="auth-gate-card"><ShieldCheck size={22} /><p className="eyebrow">Accès sécurisé</p><h1>Connectez-vous à Les Anges du Ciel</h1><p>Une session est requise pour consulter ou modifier les dossiers scolaires persistants.</p><Button className="primary-action" onClick={() => startLogin()}>Se connecter</Button></div></div>;
@@ -383,9 +382,8 @@ export default function Home() {
               </button>
               {profileOpen && (
                 <div className="profile-popover">
-                  <p className="menu-label">Aperçu des permissions</p>
-                  <button className={role === "admin" ? "role-option is-selected" : "role-option"} onClick={() => setRole("admin")}><ShieldCheck size={16} /><span><strong>Administratrice</strong><small>Accès à tous les modules</small></span></button>
-                  <button className={role === "teacher" ? "role-option is-selected" : "role-option"} onClick={() => setRole("teacher")}><GraduationCap size={16} /><span><strong>Enseignante</strong><small>Finance et administration masquées</small></span></button>
+                  <p className="menu-label">Permissions de la session</p>
+                  <div className="role-option is-selected"><ShieldCheck size={16} /><span><strong>{role === "admin" ? "Administratrice" : "Enseignante"}</strong><small>{role === "admin" ? "Accès administrateur accordé par le compte" : "Accès limité aux affectations de votre compte"}</small></span></div>
                   <button className="role-option" onClick={() => logout()}><Archive size={16} /><span><strong>Se déconnecter</strong><small>Fermer la session en cours</small></span></button>
                 </div>
               )}
@@ -394,7 +392,7 @@ export default function Home() {
         </header>
 
         <main className="app-main">
-          {!isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && <section className="page-heading">
+          {!isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && !isTeacherSuite && <section className="page-heading">
             <div>
               <p className="eyebrow">{isSystem ? "Référentiel de composants" : "Vue institutionnelle"}</p>
               <h1>{isSystem ? "Bibliothèque UI" : activeNav}</h1>
@@ -403,9 +401,9 @@ export default function Home() {
             {!isSystem && <Button className="primary-action page-action" onClick={() => showToast("Nouvelle opération", "Le formulaire adapté au module s’ouvrirait ici.")}><Plus size={17} /> Nouvelle opération</Button>}
           </section>}
 
-          {!isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill><ContextPill>Classe : 7e A</ContextPill></div>}
+          {!isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && !isTeacherSuite && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill><ContextPill>Classe : 7e A</ContextPill></div>}
 
-          {isDashboard && (
+          {isDashboard && role !== "teacher" && (
             <>
               <div className="register-band" aria-label="Repère de registre">
                 <span><i /> Indicateurs de l’établissement</span>
@@ -474,7 +472,22 @@ export default function Home() {
           {activeNav === "Affectations" && <AssignmentManagement onToast={showToast} />}
           {activeNav === "Années scolaires" && <NewYearPreparation onToast={showSuccessToast} />}
           {activeNav === "Importer les élèves" && <ExcelStudentImport onToast={showSuccessToast} onNavigate={navigate} />}
-          {!isDashboard && !isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && <WorkspacePlaceholder activeNav={activeNav} onAction={() => showToast("Création d’enregistrement", `Le formulaire ${activeNav.toLowerCase()} est prêt à être configuré.`)} />}
+          {(activeNav === "Tableau de bord" && role === "teacher") && <TeacherSuite view="dashboard" onNavigate={(view) => navigate(view === "teachings" ? "Mes enseignements" : view === "attendance" ? "Faire l’appel" : view === "grades" ? "Saisie des notes" : view === "report" ? "Rapport enseignant" : view === "evaluations" ? "Évaluations enseignant" : "Tableau de bord")} onToast={showToast} />}
+          {activeNav === "Mes enseignements" && <TeacherSuite view="teachings" onNavigate={(view) => navigate(view === "students" ? "Élèves de la classe" : view === "attendance" ? "Faire l’appel" : view === "grades" ? "Saisie des notes" : view === "evaluations" ? "Évaluations enseignant" : view === "report" ? "Rapport enseignant" : "Tableau de bord")} onToast={showToast} />}
+          {activeNav === "Élèves de la classe" && <TeacherSuite view="students" onNavigate={() => navigate("Mes enseignements")} onToast={showToast} />}
+          {activeNav === "Faire l’appel" && <TeacherSuite view="attendance" onNavigate={(view) => navigate(view === "teachings" ? "Mes enseignements" : "Historique des présences")} onToast={showSuccessToast} />}
+          {activeNav === "Historique des présences" && <TeacherSuite view="history" onNavigate={() => navigate("Faire l’appel")} onToast={showToast} />}
+          {activeNav === "Évaluations enseignant" && <TeacherSuite view="evaluations" onNavigate={() => navigate("Élèves")} onToast={showSuccessToast} />}
+          {activeNav === "Saisie des notes" && <TeacherSuite view="grades" onNavigate={() => navigate("Mes enseignements")} onToast={showSuccessToast} />}
+          {activeNav === "Saisie examen" && <TeacherSuite view="exam" onNavigate={() => navigate("Mes enseignements")} onToast={showSuccessToast} />}
+          {activeNav === "Rapport enseignant" && <TeacherSuite view="report" onNavigate={() => navigate("Mes enseignements")} onToast={showSuccessToast} />}
+          {activeNav === "Suivi des saisies" && role === "admin" && <TeacherSuite view="monitoring" onNavigate={() => navigate("Validation des notes")} onToast={showSuccessToast} />}
+          {activeNav === "Validation des notes" && role === "admin" && <TeacherSuite view="validation" onNavigate={() => navigate("Suivi des saisies")} onToast={showSuccessToast} />}
+          {activeNav === "Relevé de côtes" && <TeacherSuite view="reportcard" onNavigate={() => navigate("Tableau de bord")} onToast={showToast} />}
+          {activeNav === "Résultats classe" && role === "admin" && <TeacherSuite view="results" onNavigate={() => navigate("Tableau de bord")} onToast={showToast} />}
+          {activeNav === "Résultats élève" && <TeacherSuite view="studentresults" onNavigate={() => navigate("Tableau de bord")} onToast={showToast} />}
+          {isAdminTeachingView && role !== "admin" && <section className="workspace-placeholder"><div className="placeholder-rule" /><p className="eyebrow">Accès limité</p><h2>Autorisation requise</h2><p>Cette vue est réservée à l’administration académique. Votre compte enseignant reste limité à vos affectations actives.</p><Button className="primary-action" onClick={() => navigate("Mes enseignements")}>Retour à mes enseignements</Button></section>}
+          {!isDashboard && !isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && !isTeacherSuite && <WorkspacePlaceholder activeNav={activeNav} onAction={() => showToast("Création d’enregistrement", `Le formulaire ${activeNav.toLowerCase()} est prêt à être configuré.`)} />}
         </main>
       </div>
 

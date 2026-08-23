@@ -108,6 +108,7 @@ export const classCourses = mysqlTable("class_courses", {
 /** Fiche permanente de l’enseignant. */
 export const teachers = mysqlTable("teachers", {
   id: int("id").autoincrement().primaryKey(),
+  userId: int("userId"),
   employeeCode: varchar("employeeCode", { length: 32 }).notNull(),
   fullName: varchar("fullName", { length: 180 }).notNull(),
   phone: varchar("phone", { length: 40 }),
@@ -116,7 +117,7 @@ export const teachers = mysqlTable("teachers", {
   status: mysqlEnum("status", ["active", "inactive", "suspended"]).default("active").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [uniqueIndex("teachers_code_unique").on(table.employeeCode), index("teachers_name_index").on(table.fullName)]);
+}, (table) => [uniqueIndex("teachers_code_unique").on(table.employeeCode), uniqueIndex("teachers_user_unique").on(table.userId), index("teachers_name_index").on(table.fullName)]);
 
 /** Affectation annuelle : enseignant vers un cours déjà configuré dans une classe. */
 export const teachingAssignments = mysqlTable("teaching_assignments", {
@@ -139,6 +140,106 @@ export const studentDocuments = mysqlTable("student_documents", {
   fileUrl: text("fileUrl").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [index("student_documents_student_index").on(table.studentId), index("student_documents_enrollment_index").on(table.enrollmentId)]);
+
+/** Période pédagogique d’un cours configuré dans une classe. */
+export const academicPeriods = mysqlTable("academic_periods", {
+  id: int("id").autoincrement().primaryKey(),
+  academicYearId: int("academicYearId").notNull(),
+  code: varchar("code", { length: 32 }).notNull(),
+  label: varchar("label", { length: 80 }).notNull(),
+  kind: mysqlEnum("kind", ["period", "exam", "semester", "annual"]).notNull(),
+  sequence: int("sequence").notNull(),
+  startsAt: timestamp("startsAt"),
+  endsAt: timestamp("endsAt"),
+  status: mysqlEnum("status", ["draft", "active", "closed"]).default("draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [uniqueIndex("academic_periods_year_code_unique").on(table.academicYearId, table.code), index("academic_periods_year_index").on(table.academicYearId)]);
+
+/** Une séance d’appel rattache la présence à une affectation précise et à une date. */
+export const attendanceSessions = mysqlTable("attendance_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  teachingAssignmentId: int("teachingAssignmentId").notNull(),
+  sessionDate: timestamp("sessionDate").notNull(),
+  status: mysqlEnum("status", ["draft", "submitted"]).default("draft").notNull(),
+  submittedByUserId: int("submittedByUserId"),
+  submittedAt: timestamp("submittedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("attendance_session_unique").on(table.teachingAssignmentId, table.sessionDate), index("attendance_session_assignment_index").on(table.teachingAssignmentId)]);
+
+export const attendanceRecords = mysqlTable("attendance_records", {
+  id: int("id").autoincrement().primaryKey(),
+  attendanceSessionId: int("attendanceSessionId").notNull(),
+  enrollmentId: int("enrollmentId").notNull(),
+  status: mysqlEnum("status", ["present", "absent", "late", "excused"]).notNull(),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("attendance_record_unique").on(table.attendanceSessionId, table.enrollmentId), index("attendance_record_enrollment_index").on(table.enrollmentId)]);
+
+/** Notes brutes : seul le total dérivé est affiché, jamais saisi manuellement. */
+export const grades = mysqlTable("grades", {
+  id: int("id").autoincrement().primaryKey(),
+  teachingAssignmentId: int("teachingAssignmentId").notNull(),
+  academicPeriodId: int("academicPeriodId").notNull(),
+  enrollmentId: int("enrollmentId").notNull(),
+  score: int("score").notNull(),
+  maximum: int("maximum").notNull(),
+  status: mysqlEnum("status", ["draft", "submitted", "validated", "corrected"]).default("draft").notNull(),
+  enteredByUserId: int("enteredByUserId"),
+  submittedAt: timestamp("submittedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("grades_assignment_period_enrollment_unique").on(table.teachingAssignmentId, table.academicPeriodId, table.enrollmentId), index("grades_period_index").on(table.academicPeriodId), index("grades_enrollment_index").on(table.enrollmentId)]);
+
+/** Les corrections administratives restent auditables. */
+export const gradeAudits = mysqlTable("grade_audits", {
+  id: int("id").autoincrement().primaryKey(),
+  gradeId: int("gradeId").notNull(),
+  previousScore: int("previousScore").notNull(),
+  nextScore: int("nextScore").notNull(),
+  reason: text("reason").notNull(),
+  changedByUserId: int("changedByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [index("grade_audits_grade_index").on(table.gradeId)]);
+
+/** Critères flexibles définis par l’établissement, non figés dans l’interface. */
+export const evaluationCriteria = mysqlTable("evaluation_criteria", {
+  id: int("id").autoincrement().primaryKey(),
+  academicYearId: int("academicYearId").notNull(),
+  label: varchar("label", { length: 120 }).notNull(),
+  sequence: int("sequence").notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [uniqueIndex("evaluation_criteria_year_label_unique").on(table.academicYearId, table.label)]);
+
+export const studentEvaluations = mysqlTable("student_evaluations", {
+  id: int("id").autoincrement().primaryKey(),
+  teachingAssignmentId: int("teachingAssignmentId").notNull(),
+  academicPeriodId: int("academicPeriodId").notNull(),
+  enrollmentId: int("enrollmentId").notNull(),
+  criterionId: int("criterionId").notNull(),
+  level: mysqlEnum("level", ["TB", "B", "M", "INSUFFICIENT"]).notNull(),
+  observation: text("observation"),
+  enteredByUserId: int("enteredByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("student_evaluation_unique").on(table.teachingAssignmentId, table.academicPeriodId, table.enrollmentId, table.criterionId), index("student_evaluations_enrollment_index").on(table.enrollmentId)]);
+
+/** Rapports évolutifs par affectation et période. */
+export const teacherReports = mysqlTable("teacher_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  teachingAssignmentId: int("teachingAssignmentId").notNull(),
+  academicPeriodId: int("academicPeriodId").notNull(),
+  courseDelivery: text("courseDelivery"),
+  plannedProgram: text("plannedProgram"),
+  completedProgram: text("completedProgram"),
+  progressPercentage: int("progressPercentage"),
+  difficulties: text("difficulties"),
+  classParticipation: mysqlEnum("classParticipation", ["TB", "B", "M", "INSUFFICIENT"]),
+  generalNotes: text("generalNotes"),
+  additionalComments: text("additionalComments"),
+  status: mysqlEnum("status", ["draft", "submitted", "validated"]).default("draft").notNull(),
+  submittedAt: timestamp("submittedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("teacher_reports_assignment_period_unique").on(table.teachingAssignmentId, table.academicPeriodId)]);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
