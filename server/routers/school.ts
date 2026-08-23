@@ -79,7 +79,7 @@ export const schoolRouter = router({
     }),
   }),
   students: router({
-    list: protectedProcedure.input(z.object({ academicYearId: z.number().int().positive().optional(), search: z.string().trim().max(120).optional() }).optional()).query(async ({ input }) => {
+    list: adminProcedure.input(z.object({ academicYearId: z.number().int().positive().optional(), search: z.string().trim().max(120).optional() }).optional()).query(async ({ input }) => {
       const db = await database();
       const base = db.select({ id: students.id, studentCode: students.studentCode, lastName: students.lastName, firstName: students.firstName, sex: students.sex, status: students.status }).from(students).orderBy(asc(students.lastName), asc(students.firstName));
       return base;
@@ -125,25 +125,25 @@ export const schoolRouter = router({
     }),
   }),
   classes: router({
-    list: protectedProcedure.input(z.object({ academicYearId: z.number().int().positive() })).query(async ({ input }) => (await database()).select().from(classes).where(eq(classes.academicYearId, input.academicYearId)).orderBy(asc(classes.level), asc(classes.name))),
+    list: adminProcedure.input(z.object({ academicYearId: z.number().int().positive() })).query(async ({ input }) => (await database()).select().from(classes).where(eq(classes.academicYearId, input.academicYearId)).orderBy(asc(classes.level), asc(classes.name))),
     create: adminProcedure.input(schoolInputs.classCreate).mutation(async ({ input }) => { const db = await database(); await db.insert(classes).values({ ...input, status: "draft" }); return { ok: true }; }),
   }),
   courses: router({
-    list: protectedProcedure.query(async () => (await database()).select().from(courses).orderBy(asc(courses.name))),
+    list: adminProcedure.query(async () => (await database()).select().from(courses).orderBy(asc(courses.name))),
     create: adminProcedure.input(schoolInputs.courseCreate).mutation(async ({ input }) => { const db = await database(); await db.insert(courses).values(input); return { ok: true }; }),
     configure: adminProcedure.input(schoolInputs.classCourseCreate).mutation(async ({ input }) => { const db = await database(); await db.insert(classCourses).values(input); return { ok: true }; }),
-    configured: protectedProcedure.input(z.object({ classId: z.number().int().positive() })).query(async ({ input }) => {
+    configured: adminProcedure.input(z.object({ classId: z.number().int().positive() })).query(async ({ input }) => {
       const db = await database();
       return db.select({ id: classCourses.id, courseId: courses.id, courseName: courses.name, courseCode: courses.code, periodWeight: classCourses.periodWeight, status: classCourses.status }).from(classCourses).innerJoin(courses, eq(classCourses.courseId, courses.id)).where(eq(classCourses.classId, input.classId)).orderBy(asc(courses.name));
     }),
     updateWeight: adminProcedure.input(z.object({ classCourseId: z.number().int().positive(), periodWeight: z.number().int().min(1).max(100) })).mutation(async ({ input }) => { const db = await database(); await db.update(classCourses).set({ periodWeight: input.periodWeight }).where(eq(classCourses.id, input.classCourseId)); return { ok: true }; }),
   }),
   teachers: router({
-    list: protectedProcedure.query(async () => (await database()).select().from(teachers).orderBy(asc(teachers.fullName))),
+    list: adminProcedure.query(async () => (await database()).select().from(teachers).orderBy(asc(teachers.fullName))),
     create: adminProcedure.input(schoolInputs.teacherCreate).mutation(async ({ input }) => { const db = await database(); await db.insert(teachers).values({ ...input, phone: input.phone || null, email: input.email || null, specialties: input.specialties || null }); return { ok: true }; }),
   }),
   assignments: router({
-    list: protectedProcedure.query(async () => {
+    list: adminProcedure.query(async () => {
       const db = await database();
       return db.select({ id: teachingAssignments.id, teacherId: teachers.id, teacherName: teachers.fullName, classCourseId: classCourses.id, className: classes.name, courseName: courses.name, periodWeight: classCourses.periodWeight, status: teachingAssignments.status }).from(teachingAssignments).innerJoin(teachers, eq(teachingAssignments.teacherId, teachers.id)).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).innerJoin(courses, eq(classCourses.courseId, courses.id)).orderBy(asc(teachers.fullName));
     }),

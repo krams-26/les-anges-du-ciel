@@ -90,6 +90,6 @@
 - [x] Ajouter l’appel mobile, l’historique, les évaluations et les saisies de notes.
 - [ ] Contrôler les permissions par affectation, les validations et les états réseau.
 - [ ] Vérifier les vues desktop et mobile puis enregistrer la livraison.
-- [ ] Supprimer le basculement manuel de rôle et protéger strictement les vues enseignants par session authentifiée.
-- [ ] Rediriger les actions enseignants vers les vues pédagogiques autorisées, sans exposer le registre administratif global.
-- [ ] Corriger les options d’évaluation et valider complètement les notes avec des messages d’erreur de champ.
+- [x] Supprimer le basculement manuel de rôle et protéger strictement les vues enseignants par session authentifiée.
+- [x] Rediriger les actions enseignants vers les vues pédagogiques autorisées, sans exposer le registre administratif global.
+- [x] Corriger les options d’évaluation et valider complètement les notes avec des messages d’erreur de champ.

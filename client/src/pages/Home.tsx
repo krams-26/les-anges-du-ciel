@@ -315,6 +315,7 @@ export default function Home() {
   const isAcademicSuite = ["Cours", "Cours et pondérations", "Enseignants", "Profil enseignant", "Affectations", "Années scolaires", "Importer les élèves"].includes(activeNav);
   const isTeacherSuite = ["Mes enseignements", "Élèves de la classe", "Faire l’appel", "Historique des présences", "Évaluations enseignant", "Saisie des notes", "Saisie examen", "Rapport enseignant", "Suivi des saisies", "Validation des notes", "Relevé de côtes", "Résultats classe", "Résultats élève"].includes(activeNav) || role === "teacher";
   const isAdminTeachingView = ["Suivi des saisies", "Validation des notes", "Résultats classe"].includes(activeNav);
+  const isAdminOnlyView = ["Vue administrateur", "Élèves", "Inscription / Réinscription", "Importer les élèves", "Classes", "Espace de classe", "Cours", "Cours et pondérations", "Enseignants", "Profil enseignant", "Affectations", "Années scolaires", "Bibliothèque UI"].includes(activeNav);
 
   if (loading) return <div className="auth-gate"><CrestMark /><div className="auth-gate-card"><ShieldCheck size={22} /><h1>Vérification de l’accès</h1><p>Préparation de votre environnement de gestion scolaire sécurisé.</p></div></div>;
   if (!isAuthenticated) return <div className="auth-gate"><CrestMark /><div className="auth-gate-card"><ShieldCheck size={22} /><p className="eyebrow">Accès sécurisé</p><h1>Connectez-vous à Les Anges du Ciel</h1><p>Une session est requise pour consulter ou modifier les dossiers scolaires persistants.</p><Button className="primary-action" onClick={() => startLogin()}>Se connecter</Button></div></div>;
@@ -458,20 +459,21 @@ export default function Home() {
             </>
           )}
 
-          {isSystem && <DesignSystemShowcase onToast={showToast} />}
-          {isAdminDashboard && <AdminDashboard onNavigate={navigate} onAction={showSuccessToast} />}
-          {isStudents && <StudentManagement onToast={showToast} onSuccess={showSuccessToast} onNavigate={navigate} />}
-          {isStudentProfile && <StudentProfile onBack={() => navigate("Élèves")} onToast={showToast} />}
-          {isEnrollment && <EnrollmentWizard onBack={() => navigate("Élèves")} onSuccess={showSuccessToast} />}
-          {isClasses && <ClassManagement onToast={showToast} onOpenWorkspace={() => navigate("Espace de classe")} onNavigate={navigate} />}
-          {isClassWorkspace && <ClassWorkspace onBack={() => navigate("Classes")} onToast={showToast} />}
-          {activeNav === "Cours" && <CourseCatalog onToast={showToast} onNavigate={navigate} />}
-          {activeNav === "Cours et pondérations" && <WeightConfiguration onBack={() => navigate("Espace de classe")} onToast={showToast} />}
-          {activeNav === "Enseignants" && <TeacherManagement onToast={showToast} onNavigate={navigate} />}
-          {activeNav === "Profil enseignant" && <TeacherProfile onBack={() => navigate("Enseignants")} onToast={showToast} />}
-          {activeNav === "Affectations" && <AssignmentManagement onToast={showToast} />}
-          {activeNav === "Années scolaires" && <NewYearPreparation onToast={showSuccessToast} />}
-          {activeNav === "Importer les élèves" && <ExcelStudentImport onToast={showSuccessToast} onNavigate={navigate} />}
+          {isSystem && role === "admin" && <DesignSystemShowcase onToast={showToast} />}
+          {isAdminDashboard && role === "admin" && <AdminDashboard onNavigate={navigate} onAction={showSuccessToast} />}
+          {isStudents && role === "admin" && <StudentManagement onToast={showToast} onSuccess={showSuccessToast} onNavigate={navigate} />}
+          {isStudentProfile && role === "admin" && <StudentProfile onBack={() => navigate("Élèves")} onToast={showToast} />}
+          {isEnrollment && role === "admin" && <EnrollmentWizard onBack={() => navigate("Élèves")} onSuccess={showSuccessToast} />}
+          {isClasses && role === "admin" && <ClassManagement onToast={showToast} onOpenWorkspace={() => navigate("Espace de classe")} onNavigate={navigate} />}
+          {isClassWorkspace && role === "admin" && <ClassWorkspace onBack={() => navigate("Classes")} onToast={showToast} />}
+          {activeNav === "Cours" && role === "admin" && <CourseCatalog onToast={showToast} onNavigate={navigate} />}
+          {activeNav === "Cours et pondérations" && role === "admin" && <WeightConfiguration onBack={() => navigate("Espace de classe")} onToast={showToast} />}
+          {activeNav === "Enseignants" && role === "admin" && <TeacherManagement onToast={showToast} onNavigate={navigate} />}
+          {activeNav === "Profil enseignant" && role === "admin" && <TeacherProfile onBack={() => navigate("Enseignants")} onToast={showToast} />}
+          {activeNav === "Affectations" && role === "admin" && <AssignmentManagement onToast={showToast} />}
+          {activeNav === "Années scolaires" && role === "admin" && <NewYearPreparation onToast={showSuccessToast} />}
+          {activeNav === "Importer les élèves" && role === "admin" && <ExcelStudentImport onToast={showSuccessToast} onNavigate={navigate} />}
+          {isAdminOnlyView && role !== "admin" && <section className="workspace-placeholder"><div className="placeholder-rule" /><p className="eyebrow">Accès limité</p><h2>Module administratif</h2><p>Ce registre est réservé à l’administration. Votre compte enseignant peut uniquement consulter et gérer vos affectations pédagogiques.</p><Button className="primary-action" onClick={() => navigate("Mes enseignements")}>Retour à mes enseignements</Button></section>}
           {(activeNav === "Tableau de bord" && role === "teacher") && <TeacherSuite view="dashboard" onNavigate={(view) => navigate(view === "teachings" ? "Mes enseignements" : view === "attendance" ? "Faire l’appel" : view === "grades" ? "Saisie des notes" : view === "report" ? "Rapport enseignant" : view === "evaluations" ? "Évaluations enseignant" : "Tableau de bord")} onToast={showToast} />}
           {activeNav === "Mes enseignements" && <TeacherSuite view="teachings" onNavigate={(view) => navigate(view === "students" ? "Élèves de la classe" : view === "attendance" ? "Faire l’appel" : view === "grades" ? "Saisie des notes" : view === "evaluations" ? "Évaluations enseignant" : view === "report" ? "Rapport enseignant" : "Tableau de bord")} onToast={showToast} />}
           {activeNav === "Élèves de la classe" && <TeacherSuite view="students" onNavigate={() => navigate("Mes enseignements")} onToast={showToast} />}
