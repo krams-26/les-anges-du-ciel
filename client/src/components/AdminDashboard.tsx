@@ -4,6 +4,8 @@
  */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { QuickActionModal } from "@/components/QuickActionModal";
+import type { QuickActionKey } from "@/components/QuickActionModal";
 import {
   Area,
   AreaChart,
@@ -37,6 +39,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useState } from "react";
 
 const attendanceData = [
   { day: "Lun.", rate: 92.8 },
@@ -90,6 +93,10 @@ function FinanceLine({ label, value, sub, emphasis = false }: { label: string; v
 }
 
 export function AdminDashboard({ onNavigate, onAction }: { onNavigate: (label: string) => void; onAction: (title: string, detail: string) => void }) {
+  const [quickAction, setQuickAction] = useState<QuickActionKey | null>(() => {
+    const requested = new URLSearchParams(window.location.search).get("action");
+    return requested === "student" || requested === "payment" || requested === "assignment" || requested === "grade" || requested === "report" ? requested : null;
+  });
   return (
     <section className="admin-dashboard" aria-label="Tableau de bord administrateur">
       <header className="admin-dashboard-heading">
@@ -161,13 +168,14 @@ export function AdminDashboard({ onNavigate, onAction }: { onNavigate: (label: s
       <section className="quick-actions-band" aria-label="Actions rapides">
         <div><p className="eyebrow">Actions rapides</p><h2>Créer ou enregistrer sans quitter le poste de pilotage.</h2></div>
         <div className="quick-actions">
-          <Button className="primary-action" onClick={() => onAction("Nouvel élève", "Le formulaire d’inscription est prêt à être ouvert.")}><Plus size={15} /> Ajouter un élève</Button>
-          <Button variant="outline" className="secondary-action" onClick={() => onNavigate("Paiements")}><WalletCards size={15} /> Enregistrer un paiement</Button>
-          <Button variant="outline" className="secondary-action" onClick={() => onNavigate("Affectations")}><GraduationCap size={15} /> Affecter un enseignant</Button>
-          <Button variant="outline" className="secondary-action" onClick={() => onNavigate("Notes")}><BookOpenCheck size={15} /> Saisir une note</Button>
-          <Button variant="outline" className="secondary-action" onClick={() => onAction("Relevé en préparation", "La génération du relevé a été ajoutée à la file de traitement.")}><ReceiptText size={15} /> Générer un relevé</Button>
+          <Button className="primary-action" onClick={() => setQuickAction("student")}><Plus size={15} /> Ajouter un élève</Button>
+          <Button variant="outline" className="secondary-action" onClick={() => setQuickAction("payment")}><WalletCards size={15} /> Enregistrer un paiement</Button>
+          <Button variant="outline" className="secondary-action" onClick={() => setQuickAction("assignment")}><GraduationCap size={15} /> Affecter un enseignant</Button>
+          <Button variant="outline" className="secondary-action" onClick={() => setQuickAction("grade")}><BookOpenCheck size={15} /> Saisir une note</Button>
+          <Button variant="outline" className="secondary-action" onClick={() => setQuickAction("report")}><ReceiptText size={15} /> Générer un relevé</Button>
         </div>
       </section>
+      <QuickActionModal action={quickAction} onClose={() => setQuickAction(null)} onSuccess={onAction} />
     </section>
   );
 }

@@ -5,3 +5,9 @@
 - [x] Ajouter les visualisations d’assiduité et de performance par classe.
 - [x] Ajouter les alertes, l’activité récente et les actions rapides.
 - [x] Vérifier les vues desktop et mobile puis enregistrer la livraison.
+
+## Suivi — Actions rapides interactives
+
+- [x] Définir les formulaires pour l’inscription, le paiement, l’affectation, la note et le relevé.
+- [x] Ajouter les fenêtres modales, validations locales et confirmations de succès.
+- [x] Vérifier les interactions desktop et mobile puis enregistrer la livraison.
