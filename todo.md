@@ -81,6 +81,8 @@
 - [x] Initialiser sans destruction les données de test académiques et relier le compte enseignant connecté.
 - [x] Étendre le jeu de test avec les classes de 7e, 8e, 1re à 4e scientifiques et littéraires, dix cours et dix élèves par classe.
 - [x] Fiabiliser les écritures groupées de présence et de notes afin d’éviter les expirations de connexion.
+- [x] Fiabiliser le client Drizzle utilisé par les vérifications tRPC afin d’éviter les expirations intermittentes du pool callback.
+- [ ] Réduire et fermer proprement les connexions de vérification afin d’éviter les délais intermittents de la base distante.
 - [x] Mettre à niveau le projet avec comptes utilisateurs et base de données de test.
 - [x] Créer les tables et les procédures des dossiers scolaires, classes, cours, enseignants et affectations.
 - [ ] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
@@ -88,6 +90,22 @@
 - [x] Ajouter le lien sécurisé entre une fiche enseignant et un compte utilisateur pour activer son espace pédagogique.
 - [ ] Exécuter les parcours d’écriture de bout en bout avec un compte administrateur de test.
 - [x] Documenter la compatibilité de déploiement Vercel et enregistrer la livraison.
+
+## Suivi — Modules importés : portail, gouvernance et parcours annuels
+
+- [x] Concevoir le modèle sécurisé parent–enfant et les lectures parent limitées aux élèves liés.
+- [x] Ajouter le portail parent : profil, tableau de bord, enfants, résultats, progression, présences, finances et documents.
+- [x] Ajouter les fondations de gestion des utilisateurs, rôles, permissions individuelles et journal d’audit.
+- [x] Ajouter la configuration, l’éligibilité, la saisie et la comparaison de la deuxième session.
+- [x] Ajouter les espaces de délibération et de décision finale avec historique immuable.
+- [x] Afficher dans le comparatif une décision finale réellement lue depuis la délibération.
+- [x] Ajouter une rectification de délibération auditée, puis l’exposer distinctement dans l’historique.
+- [ ] Ajouter des tests routeur attestant de l’audit généré lors d’une validation ou rectification.
+- [ ] Ajouter un test Vitest de validation créant un audit, puis un test de rectification replaçant la décision à l’état proposé.
+- [x] Ajouter les centres personnels : profil, recherche, tâches, documents, aide et notifications selon permissions.
+- [x] Étendre la recherche globale avec les paiements autorisés et une ouverture contextualisée de chaque résultat.
+- [x] Compléter le centre documentaire avec filtres métier et actions de consultation selon permissions.
+- [ ] Tester les autorisations parent/enseignant/administrateur et les calculs académiques associés.
 
 ## Suivi — Parcours enseignants
 
@@ -101,5 +119,6 @@
 - [x] Corriger les options d’évaluation et valider complètement les notes avec des messages d’erreur de champ.
 - [x] Connecter TeacherSuite aux lectures et mutations tRPC de présence, notes et rapports.
 - [x] Ajouter les états réseau de chargement, erreur, succès et absence d’affectation dans les vues enseignants.
-- [ ] Ajouter un test de refus d’une affectation non liée au compte enseignant puis vérifier les vues connectées en desktop et mobile.
+- [x] Ajouter un test de refus d’une affectation non liée au compte enseignant.
+- [ ] Vérifier les vues enseignants connectées en desktop et mobile avec les données de test.
 - [x] Ajouter les états de chargement, erreur et vide de roster/période dans les vues Élèves, Notes et Rapport.

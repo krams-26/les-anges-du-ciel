@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import { schoolInputs } from "./routers/school";
 import { canAccessAssignment, teachingInputs } from "./routers/teaching";
+import { canValidateDeliberation, secondSessionInputs } from "./routers/secondSession";
 import type { TrpcContext } from "./_core/context";
 
 describe("validations des opérations scolaires", () => {
@@ -57,5 +58,18 @@ describe("validations des opérations scolaires", () => {
     expect(canAccessAssignment("user", 17, 18)).toBe(false);
     expect(canAccessAssignment("user", null, 18)).toBe(false);
     expect(canAccessAssignment("admin", null, 18)).toBe(true);
+  });
+
+  it("refuse une épreuve de deuxième session hors de son maximum", () => {
+    const valid = { candidateId: 1, classCourseId: 1, score: 15, maximum: 20, status: "submitted" as const };
+    expect(secondSessionInputs.assessment.parse(valid).score).toBe(15);
+    expect(() => secondSessionInputs.assessment.parse({ ...valid, score: 21 })).toThrow();
+    expect(() => secondSessionInputs.assessment.parse({ ...valid, score: -1 })).toThrow();
+  });
+
+  it("n’autorise la validation d’une délibération qu’après proposition", () => {
+    expect(canValidateDeliberation("draft")).toBe(false);
+    expect(canValidateDeliberation("proposed")).toBe(true);
+    expect(canValidateDeliberation("validated")).toBe(false);
   });
 });

@@ -1,26 +1,19 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2";
+import type { MySql2Database } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-let _db: ReturnType<typeof drizzle> | null = null;
+type Database = MySql2Database & { $client: mysql.Pool };
+let _db: Database | null = null;
 let _pool: mysql.Pool | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _pool = mysql.createPool({
-        uri: process.env.DATABASE_URL,
-        waitForConnections: true,
-        connectionLimit: 5,
-        maxIdle: 5,
-        idleTimeout: 60_000,
-        enableKeepAlive: true,
-        keepAliveInitialDelay: 0,
-        connectTimeout: 15_000,
-      });
+      _pool = mysql.createPool(process.env.DATABASE_URL);
       _db = drizzle({ client: _pool });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
@@ -28,6 +21,15 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+/** Utilisé par les scripts ponctuels afin de ne pas conserver une connexion distante après leur exécution. */
+export async function closeDbPool() {
+  const pool = _pool;
+  _pool = null;
+  _db = null;
+  if (!pool) return;
+  await pool.end();
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {

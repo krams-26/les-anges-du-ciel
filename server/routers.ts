@@ -4,6 +4,10 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { schoolRouter } from "./routers/school";
 import { teachingRouter } from "./routers/teaching";
+import { parentRouter } from "./routers/parent";
+import { governanceRouter } from "./routers/governance";
+import { secondSessionRouter } from "./routers/secondSession";
+import { personalRouter } from "./routers/personal";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -20,6 +24,10 @@ export const appRouter = router({
   }),
   school: schoolRouter,
   teaching: teachingRouter,
+  parent: parentRouter,
+  governance: governanceRouter,
+  secondSession: secondSessionRouter,
+  personal: personalRouter,
 
   // TODO: add feature routers here, e.g.
   // todo: router({

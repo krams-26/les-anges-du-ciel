@@ -1,0 +1,1 @@
+ALTER TABLE `student_documents` ADD `parentVisible` boolean DEFAULT false NOT NULL;

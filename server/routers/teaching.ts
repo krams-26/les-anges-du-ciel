@@ -11,11 +11,11 @@ async function dbOrThrow() {
   return db;
 }
 
-export function canAccessAssignment(userRole: "user" | "admin", linkedUserId: number | null, currentUserId: number) {
+export function canAccessAssignment(userRole: "user" | "admin" | "parent", linkedUserId: number | null, currentUserId: number) {
   return userRole === "admin" || linkedUserId === currentUserId;
 }
 
-async function assertAssignmentAccess(userId: number, userRole: "user" | "admin", assignmentId: number) {
+async function assertAssignmentAccess(userId: number, userRole: "user" | "admin" | "parent", assignmentId: number) {
   if (userRole === "admin") return;
   const db = await dbOrThrow();
   const matches = await db.select({ id: teachingAssignments.id, linkedUserId: teachers.userId }).from(teachingAssignments).innerJoin(teachers, eq(teachingAssignments.teacherId, teachers.id)).where(eq(teachingAssignments.id, assignmentId)).limit(1);

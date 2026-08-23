@@ -12,6 +12,12 @@ import { ClassWorkspace } from "@/components/ClassWorkspace";
 import { AssignmentManagement, CourseCatalog, ExcelStudentImport, NewYearPreparation, TeacherManagement, TeacherProfile, WeightConfiguration } from "@/components/AcademicModules";
 import { TeacherAccountLinker } from "@/components/TeacherAccountLinker";
 import { TeacherSuite } from "@/components/TeacherSuite";
+import { ParentSuite } from "@/components/ParentSuite";
+import { GovernanceSuite } from "@/components/GovernanceSuite";
+import { SecondSessionSuite } from "@/components/SecondSessionSuite";
+import { PersonalCenter } from "@/components/PersonalCenter";
+import { SearchResultPanel, type SearchResultSelection } from "@/components/SearchResultPanel";
+import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -48,6 +54,7 @@ import {
   FileText,
   FolderOpen,
   GraduationCap,
+  HelpCircle,
   LayoutDashboard,
   Menu,
   MoreHorizontal,
@@ -74,7 +81,7 @@ const logoUrl = "/manus-storage/les-anges-monogram_c8475a26.png";
 const pedagogyImage = "/manus-storage/pedagogie-context_cb7a9824.png";
 const financeImage = "/manus-storage/finance-context_86e01043.png";
 
-type Role = "admin" | "teacher";
+type Role = "admin" | "teacher" | "parent";
 
 type NavItem = {
   label: string;
@@ -90,7 +97,7 @@ type NavGroup = {
 const navGroups: NavGroup[] = [
   {
     items: [
-      { label: "Tableau de bord", icon: LayoutDashboard, roles: ["admin", "teacher"] },
+      { label: "Tableau de bord", icon: LayoutDashboard, roles: ["admin", "teacher", "parent"] },
       { label: "Vue administrateur", icon: ShieldCheck, roles: ["admin"] },
     ],
   },
@@ -115,7 +122,7 @@ const navGroups: NavGroup[] = [
       { label: "Notes", icon: BarChart3, roles: ["admin", "teacher"] },
       { label: "Relevés", icon: ReceiptText, roles: ["admin", "teacher"] },
       { label: "Résultats", icon: BarChart3, roles: ["admin", "teacher"] },
-      { label: "Examens", icon: CalendarDays, roles: ["admin", "teacher"] },
+      { label: "Examens", icon: CalendarDays, roles: ["admin"] },
     ],
   },
   {
@@ -133,7 +140,6 @@ const navGroups: NavGroup[] = [
       { label: "Enseignants", icon: UsersRound, roles: ["admin"] },
       { label: "Parents", icon: UsersRound, roles: ["admin", "teacher"] },
       { label: "Communication", icon: Send, roles: ["admin", "teacher"] },
-      { label: "Documents", icon: FolderOpen, roles: ["admin", "teacher"] },
       { label: "Rapports", icon: BarChart3, roles: ["admin"] },
     ],
   },
@@ -145,7 +151,29 @@ const navGroups: NavGroup[] = [
       { label: "Archives", icon: Archive, roles: ["admin"] },
     ],
   },
+  {
+    label: "Système",
+    items: [
+      { label: "Mes tâches", icon: ClipboardCheck, roles: ["admin", "teacher"] },
+      { label: "Documents", icon: FolderOpen, roles: ["admin", "teacher"] },
+      { label: "Centre d’aide", icon: HelpCircle, roles: ["admin", "teacher"] },
+      { label: "Mon profil", icon: UserCheck, roles: ["admin", "teacher"] },
+    ],
+  },
 ];
+
+const parentNavGroup: NavGroup = {
+  label: "Espace parent",
+  items: [
+    { label: "Mes enfants", icon: UsersRound, roles: ["parent"] },
+    { label: "Résultats scolaires", icon: BookOpen, roles: ["parent"] },
+    { label: "Présences de l’enfant", icon: ClipboardCheck, roles: ["parent"] },
+    { label: "Situation financière", icon: CircleDollarSign, roles: ["parent"] },
+    { label: "Documents de l’enfant", icon: FolderOpen, roles: ["parent"] },
+    { label: "Notifications", icon: Bell, roles: ["parent"] },
+    { label: "Mon profil", icon: UserCheck, roles: ["parent"] },
+  ],
+};
 
 const students = [
   { initials: "MK", name: "Mireille Kalume", code: "LAC-7A-014", gender: "F", attendance: "100 %", average: "16,2 / 20", status: "À jour" },
@@ -258,22 +286,25 @@ function WorkspacePlaceholder({ activeNav, onAction }: { activeNav: string; onAc
 
 export default function Home() {
   const { user, loading, isAuthenticated, logout } = useAuth();
-  const role: Role = user?.role === "admin" ? "admin" : "teacher";
+  const role: Role = user?.role === "admin" ? "admin" : user?.role === "parent" ? "parent" : "teacher";
   const [activeNav, setActiveNav] = useState(() => {
     const view = new URLSearchParams(window.location.search).get("vue");
-    return view === "administrateur" ? "Vue administrateur" : view === "eleves" ? "Élèves" : view === "profil-eleve" ? "Profil élève" : view === "inscription" ? "Inscription / Réinscription" : view === "classes" ? "Classes" : view === "classe-7a" ? "Espace de classe" : view === "cours" ? "Cours" : view === "ponderations" ? "Cours et pondérations" : view === "enseignants" ? "Enseignants" : view === "profil-enseignant" ? "Profil enseignant" : view === "affectations" ? "Affectations" : view === "annees" ? "Années scolaires" : view === "import-eleves" ? "Importer les élèves" : view === "enseignements" ? "Mes enseignements" : view === "appel" ? "Faire l’appel" : view === "historique-presences" ? "Historique des présences" : view === "evaluations-enseignant" ? "Évaluations enseignant" : view === "saisie-notes" ? "Saisie des notes" : view === "saisie-examen" ? "Saisie examen" : view === "rapport-enseignant" ? "Rapport enseignant" : view === "suivi-saisies" ? "Suivi des saisies" : view === "validation-notes" ? "Validation des notes" : view === "releve-cotes" ? "Relevé de côtes" : view === "resultats-classe" ? "Résultats classe" : view === "resultats-eleve" ? "Résultats élève" : "Tableau de bord";
+    return view === "administrateur" ? "Vue administrateur" : view === "utilisateurs" ? "Utilisateurs" : view === "examens" ? "Examens" : view === "taches" ? "Mes tâches" : view === "documents" ? "Documents" : view === "aide" ? "Centre d’aide" : view === "profil" ? "Mon profil" : view === "notifications" ? "Notifications" : view === "eleves" ? "Élèves" : view === "profil-eleve" ? "Profil élève" : view === "inscription" ? "Inscription / Réinscription" : view === "classes" ? "Classes" : view === "classe-7a" ? "Espace de classe" : view === "cours" ? "Cours" : view === "ponderations" ? "Cours et pondérations" : view === "enseignants" ? "Enseignants" : view === "profil-enseignant" ? "Profil enseignant" : view === "affectations" ? "Affectations" : view === "annees" ? "Années scolaires" : view === "import-eleves" ? "Importer les élèves" : view === "enseignements" ? "Mes enseignements" : view === "appel" ? "Faire l’appel" : view === "historique-presences" ? "Historique des présences" : view === "evaluations-enseignant" ? "Évaluations enseignant" : view === "saisie-notes" ? "Saisie des notes" : view === "saisie-examen" ? "Saisie examen" : view === "rapport-enseignant" ? "Rapport enseignant" : view === "suivi-saisies" ? "Suivi des saisies" : view === "validation-notes" ? "Validation des notes" : view === "releve-cotes" ? "Relevé de côtes" : view === "resultats-classe" ? "Résultats classe" : view === "resultats-eleve" ? "Résultats élève" : "Tableau de bord";
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [searchCategory, setSearchCategory] = useState<"all" | "students" | "staff" | "classes" | "finance" | "documents">("all");
+  const [searchResult, setSearchResult] = useState<SearchResultSelection | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [academicYear, setAcademicYear] = useState("2026-2027");
+  const searchInput = useMemo(() => ({ query: searchTerm.trim(), category: searchCategory }), [searchCategory, searchTerm]);
+  const globalSearch = trpc.personal.search.useQuery(searchInput, { enabled: searchOpen && searchTerm.trim().length >= 2 });
 
   const visibleGroups = useMemo(
-    () => navGroups
+    () => (role === "parent" ? [navGroups[0], parentNavGroup] : navGroups)
       .map((group) => ({ ...group, items: group.items.filter((item) => item.roles.includes(role)) }))
       .filter((group) => group.items.length > 0),
     [role],
@@ -281,7 +312,7 @@ export default function Home() {
 
   useEffect(() => {
     const stillVisible = visibleGroups.some((group) => group.items.some((item) => item.label === activeNav));
-    if (!stillVisible && !["Profil élève", "Espace de classe", "Cours et pondérations", "Profil enseignant", "Élèves de la classe", "Faire l’appel", "Historique des présences", "Évaluations enseignant", "Saisie des notes", "Saisie examen", "Rapport enseignant", "Suivi des saisies", "Validation des notes", "Relevé de côtes", "Résultats classe", "Résultats élève"].includes(activeNav)) setActiveNav("Tableau de bord");
+    if (!stillVisible && !["Profil élève", "Espace de classe", "Cours et pondérations", "Profil enseignant", "Élèves de la classe", "Faire l’appel", "Historique des présences", "Évaluations enseignant", "Saisie des notes", "Saisie examen", "Rapport enseignant", "Suivi des saisies", "Validation des notes", "Relevé de côtes", "Résultats classe", "Résultats élève", "Notifications", "Résultat de recherche"].includes(activeNav)) setActiveNav("Tableau de bord");
   }, [activeNav, visibleGroups]);
 
   useEffect(() => {
@@ -293,6 +324,12 @@ export default function Home() {
   const navigate = (label: string) => {
     setActiveNav(label);
     setMobileNavOpen(false);
+  };
+
+  const navigateSearchResult = (result: SearchResultSelection) => {
+    setSearchResult(result);
+    setSearchOpen(false);
+    navigate("Résultat de recherche");
   };
 
   const toggleStudent = (code: string) => {
@@ -315,6 +352,9 @@ export default function Home() {
   const isClassWorkspace = activeNav === "Espace de classe";
   const isAcademicSuite = ["Cours", "Cours et pondérations", "Enseignants", "Profil enseignant", "Affectations", "Années scolaires", "Importer les élèves"].includes(activeNav);
   const isTeacherSuite = ["Mes enseignements", "Élèves de la classe", "Faire l’appel", "Historique des présences", "Évaluations enseignant", "Saisie des notes", "Saisie examen", "Rapport enseignant", "Suivi des saisies", "Validation des notes", "Relevé de côtes", "Résultats classe", "Résultats élève"].includes(activeNav) || role === "teacher";
+  const isParentSuite = ["Mes enfants", "Résultats scolaires", "Présences de l’enfant", "Situation financière", "Documents de l’enfant", "Notifications", "Mon profil"].includes(activeNav) || role === "parent";
+  const isPersonalCenter = role !== "parent" && ["Mes tâches", "Documents", "Centre d’aide", "Mon profil", "Notifications"].includes(activeNav);
+  const isSearchResult = activeNav === "Résultat de recherche" && Boolean(searchResult);
   const isAdminTeachingView = ["Suivi des saisies", "Validation des notes", "Résultats classe"].includes(activeNav);
   const isAdminOnlyView = ["Vue administrateur", "Élèves", "Inscription / Réinscription", "Importer les élèves", "Classes", "Espace de classe", "Cours", "Cours et pondérations", "Enseignants", "Profil enseignant", "Affectations", "Années scolaires", "Bibliothèque UI"].includes(activeNav);
 
@@ -366,26 +406,18 @@ export default function Home() {
               </SelectContent>
             </Select>
             <button className="icon-button desktop-only" onClick={() => setSearchOpen(true)} aria-label="Rechercher"><Search size={19} /></button>
-            <div className="topbar-popover-wrap">
-              <button className="icon-button notification-button" onClick={() => setNotificationsOpen((value) => !value)} aria-label="Notifications"><Bell size={19} /><span /></button>
-              {notificationsOpen && (
-                <div className="notification-popover">
-                  <div className="popover-heading"><strong>Notifications</strong><button onClick={() => showToast("Notifications marquées comme lues", "Le tableau de bord a été actualisé.")}>Tout lire</button></div>
-                  <button className="notification-item" onClick={() => navigate("Présences")}><span className="notification-icon blue"><ClipboardCheck size={16} /></span><span><strong>Présences à valider</strong><small>7e A · 3 signalements à revoir</small></span></button>
-                  <button className="notification-item" onClick={() => navigate("Paiements")}><span className="notification-icon gold"><ReceiptText size={16} /></span><span><strong>12 paiements reçus</strong><small>À rapprocher aujourd’hui</small></span></button>
-                </div>
-              )}
-            </div>
+            <button className="icon-button notification-button" onClick={() => navigate("Notifications")} aria-label="Notifications"><Bell size={19} /><span /></button>
             <div className="topbar-popover-wrap">
               <button className="profile-button" onClick={() => setProfileOpen((value) => !value)}>
                 <span className="avatar avatar-primary">{(user?.name || "AM").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</span>
-                <span className="profile-copy"><strong>{user?.name || "Utilisateur"}</strong><small>{role === "admin" ? "Administratrice" : "Enseignante"}</small></span>
+                <span className="profile-copy"><strong>{user?.name || "Utilisateur"}</strong><small>{role === "admin" ? "Administratrice" : role === "parent" ? "Responsable" : "Enseignante"}</small></span>
                 <ChevronDown size={15} className="desktop-only" />
               </button>
               {profileOpen && (
                 <div className="profile-popover">
                   <p className="menu-label">Permissions de la session</p>
-                  <div className="role-option is-selected"><ShieldCheck size={16} /><span><strong>{role === "admin" ? "Administratrice" : "Enseignante"}</strong><small>{role === "admin" ? "Accès administrateur accordé par le compte" : "Accès limité aux affectations de votre compte"}</small></span></div>
+                  <div className="role-option is-selected"><ShieldCheck size={16} /><span><strong>{role === "admin" ? "Administratrice" : role === "parent" ? "Responsable" : "Enseignante"}</strong><small>{role === "admin" ? "Accès administrateur accordé par le compte" : role === "parent" ? "Accès limité aux enfants explicitement liés à votre compte" : "Accès limité aux affectations de votre compte"}</small></span></div>
+                  <button className="role-option" onClick={() => { setProfileOpen(false); navigate("Mon profil"); }}><UserCheck size={16} /><span><strong>Mon profil</strong><small>Informations et sécurité du compte</small></span></button>
                   <button className="role-option" onClick={() => logout()}><Archive size={16} /><span><strong>Se déconnecter</strong><small>Fermer la session en cours</small></span></button>
                 </div>
               )}
@@ -394,7 +426,7 @@ export default function Home() {
         </header>
 
         <main className="app-main">
-          {!isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && !isTeacherSuite && <section className="page-heading">
+          {!isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && !isTeacherSuite && !isParentSuite && !isPersonalCenter && !isSearchResult && <section className="page-heading">
             <div>
               <p className="eyebrow">{isSystem ? "Référentiel de composants" : "Vue institutionnelle"}</p>
               <h1>{isSystem ? "Bibliothèque UI" : activeNav}</h1>
@@ -403,9 +435,9 @@ export default function Home() {
             {!isSystem && <Button className="primary-action page-action" onClick={() => showToast("Nouvelle opération", "Le formulaire adapté au module s’ouvrirait ici.")}><Plus size={17} /> Nouvelle opération</Button>}
           </section>}
 
-          {!isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && !isTeacherSuite && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill><ContextPill>Classe : 7e A</ContextPill></div>}
+          {!isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && !isTeacherSuite && !isParentSuite && !isPersonalCenter && !isSearchResult && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill><ContextPill>Classe : 7e A</ContextPill></div>}
 
-          {isDashboard && role !== "teacher" && (
+          {isDashboard && role === "admin" && (
             <>
               <div className="register-band" aria-label="Repère de registre">
                 <span><i /> Indicateurs de l’établissement</span>
@@ -474,8 +506,20 @@ export default function Home() {
           {activeNav === "Affectations" && role === "admin" && <AssignmentManagement onToast={showToast} />}
           {activeNav === "Années scolaires" && role === "admin" && <NewYearPreparation onToast={showSuccessToast} />}
           {activeNav === "Importer les élèves" && role === "admin" && <ExcelStudentImport onToast={showSuccessToast} onNavigate={navigate} />}
-          {isAdminOnlyView && role !== "admin" && <section className="workspace-placeholder"><div className="placeholder-rule" /><p className="eyebrow">Accès limité</p><h2>Module administratif</h2><p>Ce registre est réservé à l’administration. Votre compte enseignant peut uniquement consulter et gérer vos affectations pédagogiques.</p><Button className="primary-action" onClick={() => navigate("Mes enseignements")}>Retour à mes enseignements</Button></section>}
+          {activeNav === "Utilisateurs" && role === "admin" && <GovernanceSuite />}
+          {activeNav === "Examens" && role === "admin" && <SecondSessionSuite />}
+          {isPersonalCenter && <PersonalCenter view={activeNav === "Mes tâches" ? "tasks" : activeNav === "Documents" ? "documents" : activeNav === "Centre d’aide" ? "help" : activeNav === "Notifications" ? "notifications" : "profile"} role={role} onNavigate={navigate} />}
+          {isSearchResult && searchResult && <SearchResultPanel result={searchResult} onBack={() => { setSearchResult(null); setSearchOpen(true); }} />}
+          {isAdminOnlyView && role !== "admin" && <section className="workspace-placeholder"><div className="placeholder-rule" /><p className="eyebrow">Accès limité</p><h2>Module administratif</h2><p>{role === "parent" ? "Ce registre est réservé à l’administration. Votre compte parent reste limité aux enfants explicitement liés à votre dossier." : "Ce registre est réservé à l’administration. Votre compte enseignant peut uniquement consulter et gérer vos affectations pédagogiques."}</p><Button className="primary-action" onClick={() => navigate(role === "parent" ? "Tableau de bord" : "Mes enseignements")}>{role === "parent" ? "Retour à mon espace" : "Retour à mes enseignements"}</Button></section>}
           {(activeNav === "Tableau de bord" && role === "teacher") && <TeacherSuite view="dashboard" onNavigate={(view) => navigate(view === "teachings" ? "Mes enseignements" : view === "attendance" ? "Faire l’appel" : view === "grades" ? "Saisie des notes" : view === "report" ? "Rapport enseignant" : view === "evaluations" ? "Évaluations enseignant" : "Tableau de bord")} onToast={showToast} />}
+          {(activeNav === "Tableau de bord" && role === "parent") && <ParentSuite view="dashboard" parentName={user?.name || "Responsable"} onNavigate={(view) => navigate(view === "children" ? "Mes enfants" : view === "results" ? "Résultats scolaires" : view === "attendance" ? "Présences de l’enfant" : view === "finances" ? "Situation financière" : view === "documents" ? "Documents de l’enfant" : view === "notifications" ? "Notifications" : view === "profile" ? "Mon profil" : "Tableau de bord")} />}
+          {role === "parent" && activeNav === "Mes enfants" && <ParentSuite view="children" parentName={user?.name || "Responsable"} onNavigate={(view) => navigate(view === "results" ? "Résultats scolaires" : "Tableau de bord")} />}
+          {role === "parent" && activeNav === "Résultats scolaires" && <ParentSuite view="results" parentName={user?.name || "Responsable"} onNavigate={() => navigate("Tableau de bord")} />}
+          {role === "parent" && activeNav === "Présences de l’enfant" && <ParentSuite view="attendance" parentName={user?.name || "Responsable"} onNavigate={() => navigate("Tableau de bord")} />}
+          {role === "parent" && activeNav === "Situation financière" && <ParentSuite view="finances" parentName={user?.name || "Responsable"} onNavigate={() => navigate("Tableau de bord")} />}
+          {role === "parent" && activeNav === "Documents de l’enfant" && <ParentSuite view="documents" parentName={user?.name || "Responsable"} onNavigate={() => navigate("Tableau de bord")} />}
+          {role === "parent" && activeNav === "Notifications" && <ParentSuite view="notifications" parentName={user?.name || "Responsable"} onNavigate={() => navigate("Tableau de bord")} />}
+          {role === "parent" && activeNav === "Mon profil" && <ParentSuite view="profile" parentName={user?.name || "Responsable"} onNavigate={() => navigate("Tableau de bord")} />}
           {activeNav === "Mes enseignements" && <TeacherSuite view="teachings" onNavigate={(view) => navigate(view === "students" ? "Élèves de la classe" : view === "attendance" ? "Faire l’appel" : view === "grades" ? "Saisie des notes" : view === "evaluations" ? "Évaluations enseignant" : view === "report" ? "Rapport enseignant" : "Tableau de bord")} onToast={showToast} />}
           {activeNav === "Élèves de la classe" && <TeacherSuite view="students" onNavigate={() => navigate("Mes enseignements")} onToast={showToast} />}
           {activeNav === "Faire l’appel" && <TeacherSuite view="attendance" onNavigate={(view) => navigate(view === "teachings" ? "Mes enseignements" : "Historique des présences")} onToast={showSuccessToast} />}
@@ -490,15 +534,16 @@ export default function Home() {
           {activeNav === "Résultats classe" && role === "admin" && <TeacherSuite view="results" onNavigate={() => navigate("Tableau de bord")} onToast={showToast} />}
           {activeNav === "Résultats élève" && <TeacherSuite view="studentresults" onNavigate={() => navigate("Tableau de bord")} onToast={showToast} />}
           {isAdminTeachingView && role !== "admin" && <section className="workspace-placeholder"><div className="placeholder-rule" /><p className="eyebrow">Accès limité</p><h2>Autorisation requise</h2><p>Cette vue est réservée à l’administration académique. Votre compte enseignant reste limité à vos affectations actives.</p><Button className="primary-action" onClick={() => navigate("Mes enseignements")}>Retour à mes enseignements</Button></section>}
-          {!isDashboard && !isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && !isTeacherSuite && <WorkspacePlaceholder activeNav={activeNav} onAction={() => showToast("Création d’enregistrement", `Le formulaire ${activeNav.toLowerCase()} est prêt à être configuré.`)} />}
+          {!isDashboard && !isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && !isTeacherSuite && !isParentSuite && !isPersonalCenter && !isSearchResult && <WorkspacePlaceholder activeNav={activeNav} onAction={() => showToast("Création d’enregistrement", `Le formulaire ${activeNav.toLowerCase()} est prêt à être configuré.`)} />}
         </main>
       </div>
 
       <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
         <DialogContent className="search-dialog">
           <DialogHeader><DialogTitle>Recherche globale</DialogTitle><DialogDescription>Retrouvez rapidement un élève, une classe, un reçu ou un document.</DialogDescription></DialogHeader>
-          <div className="dialog-search"><Search size={18} /><Input autoFocus value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Ex. Mireille Kalume, LAC-7A-014…" /></div>
-          <div className="search-suggestions"><span>Suggestions</span>{["Mireille Kalume · Élève", "7e A · Classe", "REC-2026-0814 · Reçu"].filter((item) => !searchTerm || item.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => <button key={item} onClick={() => { setSearchOpen(false); showToast("Résultat sélectionné", item); }}>{item}<ChevronRight size={16} /></button>)}</div>
+          <div className="dialog-search"><Search size={18} /><Input autoFocus value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Rechercher un élève, une classe ou un document…" /></div>
+          <div className="search-filter-row" role="group" aria-label="Filtrer les résultats de recherche">{(["all", "students", "staff", "classes", "finance", "documents"] as const).map((category) => <button key={category} className={searchCategory === category ? "is-active" : ""} onClick={() => setSearchCategory(category)}>{category === "all" ? "Tout" : category === "students" ? "Élèves" : category === "staff" ? "Personnel" : category === "classes" ? "Classes" : category === "finance" ? "Finances" : "Documents"}</button>)}</div>
+          <div className="search-suggestions"><span>{searchTerm.trim().length < 2 ? "Saisissez au moins deux caractères" : globalSearch.isLoading ? "Recherche en cours…" : "Résultats autorisés"}</span>{globalSearch.data?.map((item) => <button key={`${item.category}-${item.id}`} onClick={() => navigateSearchResult(item)}><span><strong>{item.title}</strong><small>{item.category === "students" ? "Élève" : item.category === "staff" ? "Personnel" : item.category === "classes" ? "Classe" : item.category === "finance" ? "Paiement" : "Document"} · {item.detail}</small></span><ChevronRight size={16} /></button>)}{searchTerm.trim().length >= 2 && !globalSearch.isLoading && !globalSearch.data?.length && <p className="search-empty">Aucun résultat trouvé dans les données auxquelles votre compte est autorisé à accéder.</p>}</div>
         </DialogContent>
       </Dialog>
     </div>

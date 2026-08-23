@@ -1,13 +1,15 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   academicYears,
+  auditEvents,
   classCourses,
   classes,
   courses,
   enrollments,
   guardians,
+  guardianUserLinks,
   students,
   teachers,
   teachingAssignments,
@@ -152,6 +154,27 @@ export const schoolRouter = router({
       const [alreadyLinked] = await db.select({ id: teachers.id }).from(teachers).where(eq(teachers.userId, input.userId)).limit(1);
       if (alreadyLinked && alreadyLinked.id !== input.teacherId) throw new TRPCError({ code: "CONFLICT", message: "Ce compte est déjà lié à une autre fiche enseignant." });
       await db.update(teachers).set({ userId: input.userId }).where(eq(teachers.id, input.teacherId));
+      return { ok: true };
+    }),
+  }),
+  guardians: router({
+    list: adminProcedure.query(async () => (await database()).select({ id: guardians.id, studentId: guardians.studentId, fullName: guardians.fullName, relationship: guardians.relationship, phone: guardians.phone, canViewResults: guardians.canViewResults, canMakePayments: guardians.canMakePayments }).from(guardians).orderBy(asc(guardians.fullName))),
+    linkableUsers: adminProcedure.query(async () => (await database()).select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(inArray(users.role, ["user", "parent"])).orderBy(asc(users.name))),
+    linkAccount: adminProcedure.input(z.object({ guardianId: z.number().int().positive(), userId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const db = await database();
+      const [guardian] = await db.select({ id: guardians.id }).from(guardians).where(eq(guardians.id, input.guardianId)).limit(1);
+      if (!guardian) throw new TRPCError({ code: "NOT_FOUND", message: "Le responsable est introuvable." });
+      const [user] = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.id, input.userId)).limit(1);
+      if (!user || user.role === "admin") throw new TRPCError({ code: "BAD_REQUEST", message: "Sélectionnez un compte parent valide." });
+      await db.update(users).set({ role: "parent" }).where(eq(users.id, input.userId));
+      await db.insert(guardianUserLinks).values({ guardianId: input.guardianId, userId: input.userId, status: "active", linkedByUserId: ctx.user.id }).onDuplicateKeyUpdate({ set: { status: "active", linkedByUserId: ctx.user.id, revokedAt: null } });
+      await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "parent_account_linked", module: "parents", resourceType: "guardian", resourceId: input.guardianId, afterState: JSON.stringify({ userId: input.userId }) });
+      return { ok: true };
+    }),
+    revokeAccount: adminProcedure.input(z.object({ guardianId: z.number().int().positive(), userId: z.number().int().positive(), reason: z.string().trim().min(3).max(500) })).mutation(async ({ ctx, input }) => {
+      const db = await database();
+      await db.update(guardianUserLinks).set({ status: "revoked", revokedAt: new Date() }).where(and(eq(guardianUserLinks.guardianId, input.guardianId), eq(guardianUserLinks.userId, input.userId)));
+      await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "parent_account_revoked", module: "parents", resourceType: "guardian", resourceId: input.guardianId, reason: input.reason });
       return { ok: true };
     }),
   }),
