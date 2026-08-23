@@ -65,6 +65,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { startLogin } from "@/const";
 
 const logoUrl = "/manus-storage/les-anges-monogram_c8475a26.png";
 const pedagogyImage = "/manus-storage/pedagogie-context_cb7a9824.png";
@@ -253,6 +255,7 @@ function WorkspacePlaceholder({ activeNav, onAction }: { activeNav: string; onAc
 
 export default function Home() {
   const [role, setRole] = useState<Role>("admin");
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const [activeNav, setActiveNav] = useState(() => {
     const view = new URLSearchParams(window.location.search).get("vue");
     return view === "administrateur" ? "Vue administrateur" : view === "eleves" ? "Élèves" : view === "profil-eleve" ? "Profil élève" : view === "inscription" ? "Inscription / Réinscription" : view === "classes" ? "Classes" : view === "classe-7a" ? "Espace de classe" : view === "cours" ? "Cours" : view === "ponderations" ? "Cours et pondérations" : view === "enseignants" ? "Enseignants" : view === "profil-enseignant" ? "Profil enseignant" : view === "affectations" ? "Affectations" : view === "annees" ? "Années scolaires" : view === "import-eleves" ? "Importer les élèves" : "Tableau de bord";
@@ -265,6 +268,11 @@ export default function Home() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [academicYear, setAcademicYear] = useState("2026-2027");
+
+  useEffect(() => {
+    if (user?.role === "admin") setRole("admin");
+    if (user?.role === "user") setRole("teacher");
+  }, [user?.role]);
 
   const visibleGroups = useMemo(
     () => navGroups
@@ -308,6 +316,9 @@ export default function Home() {
   const isClasses = activeNav === "Classes";
   const isClassWorkspace = activeNav === "Espace de classe";
   const isAcademicSuite = ["Cours", "Cours et pondérations", "Enseignants", "Profil enseignant", "Affectations", "Années scolaires", "Importer les élèves"].includes(activeNav);
+
+  if (loading) return <div className="auth-gate"><CrestMark /><div className="auth-gate-card"><ShieldCheck size={22} /><h1>Vérification de l’accès</h1><p>Préparation de votre environnement de gestion scolaire sécurisé.</p></div></div>;
+  if (!isAuthenticated) return <div className="auth-gate"><CrestMark /><div className="auth-gate-card"><ShieldCheck size={22} /><p className="eyebrow">Accès sécurisé</p><h1>Connectez-vous à Les Anges du Ciel</h1><p>Une session est requise pour consulter ou modifier les dossiers scolaires persistants.</p><Button className="primary-action" onClick={() => startLogin()}>Se connecter</Button></div></div>;
 
   return (
     <div className="school-app">
@@ -366,8 +377,8 @@ export default function Home() {
             </div>
             <div className="topbar-popover-wrap">
               <button className="profile-button" onClick={() => setProfileOpen((value) => !value)}>
-                <span className="avatar avatar-primary">AM</span>
-                <span className="profile-copy"><strong>Aline Mbuyi</strong><small>{role === "admin" ? "Administratrice" : "Enseignante"}</small></span>
+                <span className="avatar avatar-primary">{(user?.name || "AM").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</span>
+                <span className="profile-copy"><strong>{user?.name || "Utilisateur"}</strong><small>{role === "admin" ? "Administratrice" : "Enseignante"}</small></span>
                 <ChevronDown size={15} className="desktop-only" />
               </button>
               {profileOpen && (
@@ -375,6 +386,7 @@ export default function Home() {
                   <p className="menu-label">Aperçu des permissions</p>
                   <button className={role === "admin" ? "role-option is-selected" : "role-option"} onClick={() => setRole("admin")}><ShieldCheck size={16} /><span><strong>Administratrice</strong><small>Accès à tous les modules</small></span></button>
                   <button className={role === "teacher" ? "role-option is-selected" : "role-option"} onClick={() => setRole("teacher")}><GraduationCap size={16} /><span><strong>Enseignante</strong><small>Finance et administration masquées</small></span></button>
+                  <button className="role-option" onClick={() => logout()}><Archive size={16} /><span><strong>Se déconnecter</strong><small>Fermer la session en cours</small></span></button>
                 </div>
               )}
             </div>
@@ -453,7 +465,7 @@ export default function Home() {
           {isStudents && <StudentManagement onToast={showToast} onSuccess={showSuccessToast} onNavigate={navigate} />}
           {isStudentProfile && <StudentProfile onBack={() => navigate("Élèves")} onToast={showToast} />}
           {isEnrollment && <EnrollmentWizard onBack={() => navigate("Élèves")} onSuccess={showSuccessToast} />}
-          {isClasses && <ClassManagement onToast={showToast} onOpenWorkspace={() => navigate("Espace de classe")} />}
+          {isClasses && <ClassManagement onToast={showToast} onOpenWorkspace={() => navigate("Espace de classe")} onNavigate={navigate} />}
           {isClassWorkspace && <ClassWorkspace onBack={() => navigate("Classes")} onToast={showToast} />}
           {activeNav === "Cours" && <CourseCatalog onToast={showToast} onNavigate={navigate} />}
           {activeNav === "Cours et pondérations" && <WeightConfiguration onBack={() => navigate("Espace de classe")} onToast={showToast} />}

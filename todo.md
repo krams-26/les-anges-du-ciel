@@ -74,3 +74,11 @@
 - [x] Ajouter la préparation de l’année scolaire suivante et l’importation Excel contrôlée.
 - [x] Relier les nouvelles actions aux parcours existants et vérifier les vues responsive.
 - [x] Enregistrer la livraison globale.
+
+## Suivi — Persistance et contrôle intégral
+
+- [x] Mettre à niveau le projet avec comptes utilisateurs et base de données de test.
+- [x] Créer les tables et les procédures des dossiers scolaires, classes, cours, enseignants et affectations.
+- [ ] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
+- [ ] Exécuter les parcours d’écriture de bout en bout avec un compte administrateur de test.
+- [x] Documenter la compatibilité de déploiement Vercel et enregistrer la livraison.
