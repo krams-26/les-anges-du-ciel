@@ -60,3 +60,9 @@
 - [x] Structurer les classes par niveau et les données de pilotage annuel.
 - [x] Ajouter les filtres, actions de création, préparation d’année et accès aux détails.
 - [x] Vérifier les vues desktop et mobile puis enregistrer la livraison.
+
+## Suivi — Espace de travail de classe
+
+- [x] Structurer les indicateurs et les onglets opérationnels de la classe 7e A.
+- [x] Ajouter les vues Élèves, Cours, Enseignants, Présences, Résultats et Rapports.
+- [x] Vérifier les vues desktop et mobile puis enregistrer la livraison.

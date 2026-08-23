@@ -8,6 +8,7 @@ import { StudentManagement } from "@/components/StudentManagement";
 import { StudentProfile } from "@/components/StudentProfile";
 import { EnrollmentWizard } from "@/components/EnrollmentWizard";
 import { ClassManagement } from "@/components/ClassManagement";
+import { ClassWorkspace } from "@/components/ClassWorkspace";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -251,7 +252,7 @@ export default function Home() {
   const [role, setRole] = useState<Role>("admin");
   const [activeNav, setActiveNav] = useState(() => {
     const view = new URLSearchParams(window.location.search).get("vue");
-    return view === "administrateur" ? "Vue administrateur" : view === "eleves" ? "Élèves" : view === "profil-eleve" ? "Profil élève" : view === "inscription" ? "Inscription / Réinscription" : view === "classes" ? "Classes" : "Tableau de bord";
+    return view === "administrateur" ? "Vue administrateur" : view === "eleves" ? "Élèves" : view === "profil-eleve" ? "Profil élève" : view === "inscription" ? "Inscription / Réinscription" : view === "classes" ? "Classes" : view === "classe-7a" ? "Espace de classe" : "Tableau de bord";
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -271,7 +272,7 @@ export default function Home() {
 
   useEffect(() => {
     const stillVisible = visibleGroups.some((group) => group.items.some((item) => item.label === activeNav));
-    if (!stillVisible && activeNav !== "Profil élève") setActiveNav("Tableau de bord");
+    if (!stillVisible && activeNav !== "Profil élève" && activeNav !== "Espace de classe") setActiveNav("Tableau de bord");
   }, [activeNav, visibleGroups]);
 
   useEffect(() => {
@@ -302,6 +303,7 @@ export default function Home() {
   const isStudentProfile = activeNav === "Profil élève";
   const isEnrollment = activeNav === "Inscription / Réinscription";
   const isClasses = activeNav === "Classes";
+  const isClassWorkspace = activeNav === "Espace de classe";
 
   return (
     <div className="school-app">
@@ -376,7 +378,7 @@ export default function Home() {
         </header>
 
         <main className="app-main">
-          {!isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && <section className="page-heading">
+          {!isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && <section className="page-heading">
             <div>
               <p className="eyebrow">{isSystem ? "Référentiel de composants" : "Vue institutionnelle"}</p>
               <h1>{isSystem ? "Bibliothèque UI" : activeNav}</h1>
@@ -385,7 +387,7 @@ export default function Home() {
             {!isSystem && <Button className="primary-action page-action" onClick={() => showToast("Nouvelle opération", "Le formulaire adapté au module s’ouvrirait ici.")}><Plus size={17} /> Nouvelle opération</Button>}
           </section>}
 
-          {!isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill><ContextPill>Classe : 7e A</ContextPill></div>}
+          {!isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill><ContextPill>Classe : 7e A</ContextPill></div>}
 
           {isDashboard && (
             <>
@@ -447,8 +449,9 @@ export default function Home() {
           {isStudents && <StudentManagement onToast={showToast} onSuccess={showSuccessToast} onNavigate={navigate} />}
           {isStudentProfile && <StudentProfile onBack={() => navigate("Élèves")} onToast={showToast} />}
           {isEnrollment && <EnrollmentWizard onBack={() => navigate("Élèves")} onSuccess={showSuccessToast} />}
-          {isClasses && <ClassManagement onToast={showToast} />}
-          {!isDashboard && !isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && <WorkspacePlaceholder activeNav={activeNav} onAction={() => showToast("Création d’enregistrement", `Le formulaire ${activeNav.toLowerCase()} est prêt à être configuré.`)} />}
+          {isClasses && <ClassManagement onToast={showToast} onOpenWorkspace={() => navigate("Espace de classe")} />}
+          {isClassWorkspace && <ClassWorkspace onBack={() => navigate("Classes")} onToast={showToast} />}
+          {!isDashboard && !isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && <WorkspacePlaceholder activeNav={activeNav} onAction={() => showToast("Création d’enregistrement", `Le formulaire ${activeNav.toLowerCase()} est prêt à être configuré.`)} />}
         </main>
       </div>
 
