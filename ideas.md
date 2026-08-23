@@ -72,3 +72,5 @@ Le signe est un **monogramme angélique abstrait** : un ange/ailes réduit à de
 ## Style Decisions
 
 Les modules principaux doivent désormais se lire comme des **bandes de dossier alignées**, séparées par des règles et des lisses cobalt, plutôt que comme une collection de cartes SaaS flottantes. Les images sont réservées aux références documentaires ou aux états de travail ; les espaces de décision privilégient le monogramme, les repères de registre et l’information opérationnelle. Le monogramme aux arcs angéliques et à la croix ajourée reste constamment visible dans l’identité, notamment dans le repère de navigation et les sceaux de dossier.
+
+Les écrans de gestion amplifient désormais ce repère par un **sceau discret de dossier**, utilisé dans les bandeaux d’orientation et les zones de contrôle. Les en-têtes adoptent une hiérarchie typographique plus affirmée, tandis que les surfaces de travail privilégient les règles minérales, les lisses cobalt et une microcopie qui nomme explicitement la donnée concernée puis l’action suivante.

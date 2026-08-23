@@ -66,3 +66,11 @@
 - [x] Structurer les indicateurs et les onglets opérationnels de la classe 7e A.
 - [x] Ajouter les vues Élèves, Cours, Enseignants, Présences, Résultats et Rapports.
 - [x] Vérifier les vues desktop et mobile puis enregistrer la livraison.
+
+## Suivi — Suite académique et administrative
+
+- [x] Ajouter le catalogue de cours et la configuration des pondérations par classe.
+- [x] Ajouter les enseignants, leurs profils et la gestion des affectations.
+- [x] Ajouter la préparation de l’année scolaire suivante et l’importation Excel contrôlée.
+- [x] Relier les nouvelles actions aux parcours existants et vérifier les vues responsive.
+- [x] Enregistrer la livraison globale.
