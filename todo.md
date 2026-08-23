@@ -30,3 +30,9 @@
 - [x] Définir le format CSV attendu et les règles de validation.
 - [x] Ajouter l’assistant d’importation avec sélection, aperçu et confirmation.
 - [x] Vérifier le parcours desktop et mobile puis enregistrer la livraison.
+
+## Suivi — Profil élève
+
+- [x] Structurer l’identité permanente et le dossier scolaire annuel de Jean Kabila.
+- [x] Créer l’en-tête, les onglets, les synthèses, documents et historique.
+- [x] Vérifier le rendu desktop et mobile puis enregistrer la livraison.
