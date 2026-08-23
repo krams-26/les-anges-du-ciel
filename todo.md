@@ -80,7 +80,7 @@
 - [x] Mettre à niveau le projet avec comptes utilisateurs et base de données de test.
 - [x] Créer les tables et les procédures des dossiers scolaires, classes, cours, enseignants et affectations.
 - [ ] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
-- [x] Raccorder les affectations administratives au registre persistant, sans données de démonstration.
+- [x] Raccorder les affectations et pondérations administratives au registre persistant, sans données de démonstration.
 - [x] Ajouter le lien sécurisé entre une fiche enseignant et un compte utilisateur pour activer son espace pédagogique.
 - [ ] Exécuter les parcours d’écriture de bout en bout avec un compte administrateur de test.
 - [x] Documenter la compatibilité de déploiement Vercel et enregistrer la livraison.
