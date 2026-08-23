@@ -54,3 +54,9 @@
 - [x] Structurer les cinq étapes, les types d’inscription et les données permanentes ou annuelles.
 - [x] Ajouter l’assistant, les validations, le récapitulatif et la confirmation de succès.
 - [x] Vérifier les vues desktop et mobile puis enregistrer la livraison.
+
+## Suivi — Gestion des classes
+
+- [x] Structurer les classes par niveau et les données de pilotage annuel.
+- [x] Ajouter les filtres, actions de création, préparation d’année et accès aux détails.
+- [x] Vérifier les vues desktop et mobile puis enregistrer la livraison.
