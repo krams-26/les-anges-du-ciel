@@ -17,3 +17,10 @@
 - [x] Définir les messages de succès contextualisés après chaque soumission.
 - [x] Ajouter une présentation toast animée cohérente avec le système institutionnel.
 - [x] Vérifier le rendu et enregistrer la livraison.
+
+## Suivi — Gestion des élèves
+
+- [x] Structurer les données d’identité permanente et d’inscription annuelle.
+- [x] Créer le tableau, les filtres, la sélection multiple et le panneau de synthèse.
+- [x] Ajouter les actions contextuelles, les états vide et chargement, et la pagination.
+- [x] Vérifier le rendu desktop et mobile puis enregistrer la livraison.

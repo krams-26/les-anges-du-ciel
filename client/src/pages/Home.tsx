@@ -4,6 +4,7 @@
  */
 import { DesignSystemShowcase } from "@/components/DesignSystemShowcase";
 import { AdminDashboard } from "@/components/AdminDashboard";
+import { StudentManagement } from "@/components/StudentManagement";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -244,7 +245,10 @@ function WorkspacePlaceholder({ activeNav, onAction }: { activeNav: string; onAc
 
 export default function Home() {
   const [role, setRole] = useState<Role>("admin");
-  const [activeNav, setActiveNav] = useState(() => new URLSearchParams(window.location.search).get("vue") === "administrateur" ? "Vue administrateur" : "Tableau de bord");
+  const [activeNav, setActiveNav] = useState(() => {
+    const view = new URLSearchParams(window.location.search).get("vue");
+    return view === "administrateur" ? "Vue administrateur" : view === "eleves" ? "Élèves" : "Tableau de bord";
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -290,6 +294,7 @@ export default function Home() {
   const isDashboard = activeNav === "Tableau de bord";
   const isSystem = activeNav === "Bibliothèque UI";
   const isAdminDashboard = activeNav === "Vue administrateur";
+  const isStudents = activeNav === "Élèves";
 
   return (
     <div className="school-app">
@@ -364,7 +369,7 @@ export default function Home() {
         </header>
 
         <main className="app-main">
-          {!isAdminDashboard && <section className="page-heading">
+          {!isAdminDashboard && !isStudents && <section className="page-heading">
             <div>
               <p className="eyebrow">{isSystem ? "Référentiel de composants" : "Vue institutionnelle"}</p>
               <h1>{isSystem ? "Bibliothèque UI" : activeNav}</h1>
@@ -373,7 +378,7 @@ export default function Home() {
             {!isSystem && <Button className="primary-action page-action" onClick={() => showToast("Nouvelle opération", "Le formulaire adapté au module s’ouvrirait ici.")}><Plus size={17} /> Nouvelle opération</Button>}
           </section>}
 
-          {!isSystem && !isAdminDashboard && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill><ContextPill>Classe : 7e A</ContextPill></div>}
+          {!isSystem && !isAdminDashboard && !isStudents && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill><ContextPill>Classe : 7e A</ContextPill></div>}
 
           {isDashboard && (
             <>
@@ -432,7 +437,8 @@ export default function Home() {
 
           {isSystem && <DesignSystemShowcase onToast={showToast} />}
           {isAdminDashboard && <AdminDashboard onNavigate={navigate} onAction={showSuccessToast} />}
-          {!isDashboard && !isSystem && !isAdminDashboard && <WorkspacePlaceholder activeNav={activeNav} onAction={() => showToast("Création d’enregistrement", `Le formulaire ${activeNav.toLowerCase()} est prêt à être configuré.`)} />}
+          {isStudents && <StudentManagement onToast={showToast} onSuccess={showSuccessToast} />}
+          {!isDashboard && !isSystem && !isAdminDashboard && !isStudents && <WorkspacePlaceholder activeNav={activeNav} onAction={() => showToast("Création d’enregistrement", `Le formulaire ${activeNav.toLowerCase()} est prêt à être configuré.`)} />}
         </main>
       </div>
 
