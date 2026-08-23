@@ -6,6 +6,7 @@ import { DesignSystemShowcase } from "@/components/DesignSystemShowcase";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { StudentManagement } from "@/components/StudentManagement";
 import { StudentProfile } from "@/components/StudentProfile";
+import { EnrollmentWizard } from "@/components/EnrollmentWizard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -89,6 +90,7 @@ const navGroups: NavGroup[] = [
     label: "Scolarité",
     items: [
       { label: "Élèves", icon: UsersRound, roles: ["admin", "teacher"] },
+      { label: "Inscription / Réinscription", icon: UserCheck, roles: ["admin"] },
       { label: "Classes", icon: GraduationCap, roles: ["admin", "teacher"] },
       { label: "Cours", icon: BookOpen, roles: ["admin", "teacher"] },
       { label: "Affectations", icon: UserCheck, roles: ["admin", "teacher"] },
@@ -248,7 +250,7 @@ export default function Home() {
   const [role, setRole] = useState<Role>("admin");
   const [activeNav, setActiveNav] = useState(() => {
     const view = new URLSearchParams(window.location.search).get("vue");
-    return view === "administrateur" ? "Vue administrateur" : view === "eleves" ? "Élèves" : view === "profil-eleve" ? "Profil élève" : "Tableau de bord";
+    return view === "administrateur" ? "Vue administrateur" : view === "eleves" ? "Élèves" : view === "profil-eleve" ? "Profil élève" : view === "inscription" ? "Inscription / Réinscription" : "Tableau de bord";
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -297,6 +299,7 @@ export default function Home() {
   const isAdminDashboard = activeNav === "Vue administrateur";
   const isStudents = activeNav === "Élèves";
   const isStudentProfile = activeNav === "Profil élève";
+  const isEnrollment = activeNav === "Inscription / Réinscription";
 
   return (
     <div className="school-app">
@@ -371,7 +374,7 @@ export default function Home() {
         </header>
 
         <main className="app-main">
-          {!isAdminDashboard && !isStudents && !isStudentProfile && <section className="page-heading">
+          {!isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && <section className="page-heading">
             <div>
               <p className="eyebrow">{isSystem ? "Référentiel de composants" : "Vue institutionnelle"}</p>
               <h1>{isSystem ? "Bibliothèque UI" : activeNav}</h1>
@@ -380,7 +383,7 @@ export default function Home() {
             {!isSystem && <Button className="primary-action page-action" onClick={() => showToast("Nouvelle opération", "Le formulaire adapté au module s’ouvrirait ici.")}><Plus size={17} /> Nouvelle opération</Button>}
           </section>}
 
-          {!isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill><ContextPill>Classe : 7e A</ContextPill></div>}
+          {!isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill><ContextPill>Classe : 7e A</ContextPill></div>}
 
           {isDashboard && (
             <>
@@ -441,7 +444,8 @@ export default function Home() {
           {isAdminDashboard && <AdminDashboard onNavigate={navigate} onAction={showSuccessToast} />}
           {isStudents && <StudentManagement onToast={showToast} onSuccess={showSuccessToast} onNavigate={navigate} />}
           {isStudentProfile && <StudentProfile onBack={() => navigate("Élèves")} onToast={showToast} />}
-          {!isDashboard && !isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && <WorkspacePlaceholder activeNav={activeNav} onAction={() => showToast("Création d’enregistrement", `Le formulaire ${activeNav.toLowerCase()} est prêt à être configuré.`)} />}
+          {isEnrollment && <EnrollmentWizard onBack={() => navigate("Élèves")} onSuccess={showSuccessToast} />}
+          {!isDashboard && !isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && <WorkspacePlaceholder activeNav={activeNav} onAction={() => showToast("Création d’enregistrement", `Le formulaire ${activeNav.toLowerCase()} est prêt à être configuré.`)} />}
         </main>
       </div>
 

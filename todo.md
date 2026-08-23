@@ -42,3 +42,15 @@
 - [x] Définir les séries de notes annuelles et les options de lecture du graphique.
 - [x] Ajouter le graphique interactif à l’onglet Résultats.
 - [x] Vérifier le rendu desktop et mobile puis enregistrer la livraison.
+
+## Suivi — Extension des modules administratifs
+
+- [ ] Définir l’ordre de réalisation des modules décrits dans le brief.
+- [ ] Concevoir et intégrer les prochains écrans administratifs retenus.
+- [ ] Vérifier les parcours et enregistrer la prochaine livraison.
+
+## Suivi — Inscription / Réinscription
+
+- [x] Structurer les cinq étapes, les types d’inscription et les données permanentes ou annuelles.
+- [x] Ajouter l’assistant, les validations, le récapitulatif et la confirmation de succès.
+- [x] Vérifier les vues desktop et mobile puis enregistrer la livraison.
