@@ -166,9 +166,10 @@ export const schoolRouter = router({
     }),
   }),
   guardians: router({
-    list: adminProcedure.query(async () => (await database()).select({ id: guardians.id, studentId: guardians.studentId, fullName: guardians.fullName, relationship: guardians.relationship, phone: guardians.phone, canViewResults: guardians.canViewResults, canMakePayments: guardians.canMakePayments }).from(guardians).orderBy(asc(guardians.fullName))),
-    linkableUsers: adminProcedure.query(async () => (await database()).select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(inArray(users.role, ["user", "parent"])).orderBy(asc(users.name))),
+    list: adminProcedure.query(async ({ ctx }) => { await assertPermission(ctx.user.id, "students", "view"); return (await database()).select({ id: guardians.id, studentId: guardians.studentId, fullName: guardians.fullName, relationship: guardians.relationship, phone: guardians.phone, canViewResults: guardians.canViewResults, canMakePayments: guardians.canMakePayments }).from(guardians).orderBy(asc(guardians.fullName)); }),
+    linkableUsers: adminProcedure.query(async ({ ctx }) => { await assertPermission(ctx.user.id, "users", "view"); return (await database()).select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(inArray(users.role, ["user", "parent"])).orderBy(asc(users.name)); }),
     linkAccount: adminProcedure.input(z.object({ guardianId: z.number().int().positive(), userId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "users", "edit");
       const db = await database();
       const [guardian] = await db.select({ id: guardians.id }).from(guardians).where(eq(guardians.id, input.guardianId)).limit(1);
       if (!guardian) throw new TRPCError({ code: "NOT_FOUND", message: "Le responsable est introuvable." });
@@ -180,6 +181,7 @@ export const schoolRouter = router({
       return { ok: true };
     }),
     revokeAccount: adminProcedure.input(z.object({ guardianId: z.number().int().positive(), userId: z.number().int().positive(), reason: z.string().trim().min(3).max(500) })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "users", "edit");
       const db = await database();
       await db.update(guardianUserLinks).set({ status: "revoked", revokedAt: new Date() }).where(and(eq(guardianUserLinks.guardianId, input.guardianId), eq(guardianUserLinks.userId, input.userId)));
       await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "parent_account_revoked", module: "parents", resourceType: "guardian", resourceId: input.guardianId, reason: input.reason });
@@ -187,11 +189,12 @@ export const schoolRouter = router({
     }),
   }),
   assignments: router({
-    list: adminProcedure.query(async () => {
+    list: adminProcedure.query(async ({ ctx }) => {
+      await assertPermission(ctx.user.id, "settings", "view");
       const db = await database();
       return db.select({ id: teachingAssignments.id, teacherId: teachers.id, teacherName: teachers.fullName, classCourseId: classCourses.id, className: classes.name, courseName: courses.name, periodWeight: classCourses.periodWeight, status: teachingAssignments.status }).from(teachingAssignments).innerJoin(teachers, eq(teachingAssignments.teacherId, teachers.id)).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).innerJoin(courses, eq(classCourses.courseId, courses.id)).orderBy(asc(teachers.fullName));
     }),
-    create: adminProcedure.input(schoolInputs.assignmentCreate).mutation(async ({ input }) => { const db = await database(); const duplicate = await db.select({ id: teachingAssignments.id }).from(teachingAssignments).where(and(eq(teachingAssignments.teacherId, input.teacherId), eq(teachingAssignments.classCourseId, input.classCourseId))).limit(1); if (duplicate.length) throw new TRPCError({ code: "CONFLICT", message: "Cette affectation existe déjà." }); await db.insert(teachingAssignments).values(input); return { ok: true }; }),
-    deactivate: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input }) => { const db = await database(); await db.update(teachingAssignments).set({ status: "inactive" }).where(eq(teachingAssignments.id, input.id)); return { ok: true }; }),
+    create: adminProcedure.input(schoolInputs.assignmentCreate).mutation(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "settings", "edit"); const db = await database(); const duplicate = await db.select({ id: teachingAssignments.id }).from(teachingAssignments).where(and(eq(teachingAssignments.teacherId, input.teacherId), eq(teachingAssignments.classCourseId, input.classCourseId))).limit(1); if (duplicate.length) throw new TRPCError({ code: "CONFLICT", message: "Cette affectation existe déjà." }); await db.insert(teachingAssignments).values(input); return { ok: true }; }),
+    deactivate: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "settings", "edit"); const db = await database(); await db.update(teachingAssignments).set({ status: "inactive" }).where(eq(teachingAssignments.id, input.id)); return { ok: true }; }),
   }),
 });

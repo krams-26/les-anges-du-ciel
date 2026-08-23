@@ -127,6 +127,6 @@
 
 - [ ] Appliquer les dérogations de permissions et les rôles d’accès aux opérations sensibles côté serveur.
 - [ ] Étendre les permissions fines aux procédures scolaires et de deuxième session au-delà de la gouvernance.
-- [ ] Ajouter des tests Vitest d’autorisation et de refus pour rôle hérité et dérogation utilisateur.
-- [ ] Construire le centre de contrôle annuel à partir des états pédagogiques, financiers et de délibération réels.
+- [x] Ajouter des tests Vitest d’autorisation et de refus pour rôle hérité et dérogation utilisateur.
+- [x] Construire le centre de contrôle annuel à partir des états pédagogiques, financiers et de délibération réels.
 - [ ] Vérifier les nouveaux contrôles de permissions et le centre annuel en desktop et mobile.

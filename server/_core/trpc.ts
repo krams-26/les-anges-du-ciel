@@ -13,6 +13,15 @@ const t = initTRPC.context<TrpcContext>().create({
 export const router = t.router;
 export const publicProcedure = t.procedure;
 
+async function assertActiveAccount(userId: number) {
+  const db = await getDb();
+  if (!db) return;
+  const [account] = await db.select({ accountStatus: users.accountStatus }).from(users).where(eq(users.id, userId)).limit(1);
+  if (account && account.accountStatus !== "active") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Ce compte n’est pas actif. Veuillez contacter l’administration." });
+  }
+}
+
 const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;
 
@@ -20,13 +29,7 @@ const requireUser = t.middleware(async opts => {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
-  const db = await getDb();
-  if (db) {
-    const [account] = await db.select({ accountStatus: users.accountStatus }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
-    if (account && account.accountStatus !== "active") {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Ce compte n’est pas actif. Veuillez contacter l’administration." });
-    }
-  }
+  await assertActiveAccount(ctx.user.id);
 
   return next({
     ctx: {
@@ -38,13 +41,14 @@ const requireUser = t.middleware(async opts => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
-export const adminProcedure = protectedProcedure.use(
+export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
     if (!ctx.user || ctx.user.role !== 'admin') {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
+    await assertActiveAccount(ctx.user.id);
 
     return next({
       ctx: {
