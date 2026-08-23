@@ -80,6 +80,8 @@
 - [x] Mettre à niveau le projet avec comptes utilisateurs et base de données de test.
 - [x] Créer les tables et les procédures des dossiers scolaires, classes, cours, enseignants et affectations.
 - [ ] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
+- [x] Raccorder les affectations administratives au registre persistant, sans données de démonstration.
+- [x] Ajouter le lien sécurisé entre une fiche enseignant et un compte utilisateur pour activer son espace pédagogique.
 - [ ] Exécuter les parcours d’écriture de bout en bout avec un compte administrateur de test.
 - [x] Documenter la compatibilité de déploiement Vercel et enregistrer la livraison.
 
@@ -94,6 +96,6 @@
 - [x] Rediriger les actions enseignants vers les vues pédagogiques autorisées, sans exposer le registre administratif global.
 - [x] Corriger les options d’évaluation et valider complètement les notes avec des messages d’erreur de champ.
 - [x] Connecter TeacherSuite aux lectures et mutations tRPC de présence, notes et rapports.
-- [ ] Ajouter les états réseau de chargement, erreur, succès et absence d’affectation dans les vues enseignants.
+- [x] Ajouter les états réseau de chargement, erreur, succès et absence d’affectation dans les vues enseignants.
 - [ ] Ajouter un test de refus d’une affectation non liée au compte enseignant puis vérifier les vues connectées en desktop et mobile.
-- [ ] Ajouter les états de chargement, erreur et vide de roster/période dans les vues Élèves, Notes et Rapport.
+- [x] Ajouter les états de chargement, erreur et vide de roster/période dans les vues Élèves, Notes et Rapport.

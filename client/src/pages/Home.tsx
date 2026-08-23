@@ -10,6 +10,7 @@ import { EnrollmentWizard } from "@/components/EnrollmentWizard";
 import { ClassManagement } from "@/components/ClassManagement";
 import { ClassWorkspace } from "@/components/ClassWorkspace";
 import { AssignmentManagement, CourseCatalog, ExcelStudentImport, NewYearPreparation, TeacherManagement, TeacherProfile, WeightConfiguration } from "@/components/AcademicModules";
+import { TeacherAccountLinker } from "@/components/TeacherAccountLinker";
 import { TeacherSuite } from "@/components/TeacherSuite";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -468,7 +469,7 @@ export default function Home() {
           {isClassWorkspace && role === "admin" && <ClassWorkspace onBack={() => navigate("Classes")} onToast={showToast} />}
           {activeNav === "Cours" && role === "admin" && <CourseCatalog onToast={showToast} onNavigate={navigate} />}
           {activeNav === "Cours et pondérations" && role === "admin" && <WeightConfiguration onBack={() => navigate("Espace de classe")} onToast={showToast} />}
-          {activeNav === "Enseignants" && role === "admin" && <TeacherManagement onToast={showToast} onNavigate={navigate} />}
+          {activeNav === "Enseignants" && role === "admin" && <><TeacherManagement onToast={showToast} onNavigate={navigate} /><TeacherAccountLinker onToast={showToast} /></>}
           {activeNav === "Profil enseignant" && role === "admin" && <TeacherProfile onBack={() => navigate("Enseignants")} onToast={showToast} />}
           {activeNav === "Affectations" && role === "admin" && <AssignmentManagement onToast={showToast} />}
           {activeNav === "Années scolaires" && role === "admin" && <NewYearPreparation onToast={showSuccessToast} />}

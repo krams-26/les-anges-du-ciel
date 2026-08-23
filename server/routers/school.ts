@@ -11,6 +11,7 @@ import {
   students,
   teachers,
   teachingAssignments,
+  users,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
@@ -141,6 +142,18 @@ export const schoolRouter = router({
   teachers: router({
     list: adminProcedure.query(async () => (await database()).select().from(teachers).orderBy(asc(teachers.fullName))),
     create: adminProcedure.input(schoolInputs.teacherCreate).mutation(async ({ input }) => { const db = await database(); await db.insert(teachers).values({ ...input, phone: input.phone || null, email: input.email || null, specialties: input.specialties || null }); return { ok: true }; }),
+    linkableUsers: adminProcedure.query(async () => (await database()).select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).where(eq(users.role, "user")).orderBy(asc(users.name))),
+    linkAccount: adminProcedure.input(z.object({ teacherId: z.number().int().positive(), userId: z.number().int().positive() })).mutation(async ({ input }) => {
+      const db = await database();
+      const [teacher] = await db.select({ id: teachers.id }).from(teachers).where(eq(teachers.id, input.teacherId)).limit(1);
+      if (!teacher) throw new TRPCError({ code: "NOT_FOUND", message: "La fiche enseignant est introuvable." });
+      const [user] = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.id, input.userId)).limit(1);
+      if (!user || user.role !== "user") throw new TRPCError({ code: "BAD_REQUEST", message: "Sélectionnez un compte enseignant valide." });
+      const [alreadyLinked] = await db.select({ id: teachers.id }).from(teachers).where(eq(teachers.userId, input.userId)).limit(1);
+      if (alreadyLinked && alreadyLinked.id !== input.teacherId) throw new TRPCError({ code: "CONFLICT", message: "Ce compte est déjà lié à une autre fiche enseignant." });
+      await db.update(teachers).set({ userId: input.userId }).where(eq(teachers.id, input.teacherId));
+      return { ok: true };
+    }),
   }),
   assignments: router({
     list: adminProcedure.query(async () => {
