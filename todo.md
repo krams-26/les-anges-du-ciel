@@ -36,3 +36,9 @@
 - [x] Structurer l’identité permanente et le dossier scolaire annuel de Jean Kabila.
 - [x] Créer l’en-tête, les onglets, les synthèses, documents et historique.
 - [x] Vérifier le rendu desktop et mobile puis enregistrer la livraison.
+
+## Suivi — Progression des notes
+
+- [x] Définir les séries de notes annuelles et les options de lecture du graphique.
+- [x] Ajouter le graphique interactif à l’onglet Résultats.
+- [x] Vérifier le rendu desktop et mobile puis enregistrer la livraison.
