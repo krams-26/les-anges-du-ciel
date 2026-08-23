@@ -266,6 +266,12 @@ export default function Home() {
     if (!stillVisible) setActiveNav("Tableau de bord");
   }, [activeNav, visibleGroups]);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("toast") !== "success") return undefined;
+    const timer = window.setTimeout(() => toast.success("Paiement enregistré", { description: "185 000 CDF ont été enregistrés pour Mireille Kalume.", duration: 4800 }), 120);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const navigate = (label: string) => {
     setActiveNav(label);
     setMobileNavOpen(false);
@@ -280,6 +286,7 @@ export default function Home() {
   };
 
   const showToast = (title: string, description: string) => toast(title, { description });
+  const showSuccessToast = (title: string, description: string) => toast.success(title, { description, duration: 4800 });
   const isDashboard = activeNav === "Tableau de bord";
   const isSystem = activeNav === "Bibliothèque UI";
   const isAdminDashboard = activeNav === "Vue administrateur";
@@ -424,7 +431,7 @@ export default function Home() {
           )}
 
           {isSystem && <DesignSystemShowcase onToast={showToast} />}
-          {isAdminDashboard && <AdminDashboard onNavigate={navigate} onAction={showToast} />}
+          {isAdminDashboard && <AdminDashboard onNavigate={navigate} onAction={showSuccessToast} />}
           {!isDashboard && !isSystem && !isAdminDashboard && <WorkspacePlaceholder activeNav={activeNav} onAction={() => showToast("Création d’enregistrement", `Le formulaire ${activeNav.toLowerCase()} est prêt à être configuré.`)} />}
         </main>
       </div>

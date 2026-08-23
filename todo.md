@@ -11,3 +11,9 @@
 - [x] Définir les formulaires pour l’inscription, le paiement, l’affectation, la note et le relevé.
 - [x] Ajouter les fenêtres modales, validations locales et confirmations de succès.
 - [x] Vérifier les interactions desktop et mobile puis enregistrer la livraison.
+
+## Suivi — Confirmations toast
+
+- [x] Définir les messages de succès contextualisés après chaque soumission.
+- [x] Ajouter une présentation toast animée cohérente avec le système institutionnel.
+- [x] Vérifier le rendu et enregistrer la livraison.
