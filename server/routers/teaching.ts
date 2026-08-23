@@ -53,19 +53,25 @@ export const teachingRouter = router({
       await db.insert(attendanceSessions).values({ teachingAssignmentId: input.assignmentId, sessionDate: input.sessionDate, status: "submitted", submittedByUserId: ctx.user.id, submittedAt: new Date() }).onDuplicateKeyUpdate({ set: { status: "submitted", submittedByUserId: ctx.user.id, submittedAt: new Date() } });
       const [session] = await db.select({ id: attendanceSessions.id }).from(attendanceSessions).where(and(eq(attendanceSessions.teachingAssignmentId, input.assignmentId), eq(attendanceSessions.sessionDate, input.sessionDate))).limit(1);
       if (!session) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "La séance de présence n’a pas été créée." });
-      await Promise.all(input.records.map((record) => db.insert(attendanceRecords).values({ attendanceSessionId: session.id, enrollmentId: record.enrollmentId, status: record.status, note: record.note || null }).onDuplicateKeyUpdate({ set: { status: record.status, note: record.note || null } })));
+      for (const record of input.records) {
+        await db.insert(attendanceRecords).values({ attendanceSessionId: session.id, enrollmentId: record.enrollmentId, status: record.status, note: record.note || null }).onDuplicateKeyUpdate({ set: { status: record.status, note: record.note || null } });
+      }
       return { saved: input.records.length };
     }),
   }),
   grades: router({
     saveDraft: protectedProcedure.input(teachingInputs.grades).mutation(async ({ ctx, input }) => {
       await assertAssignmentAccess(ctx.user.id, ctx.user.role, input.assignmentId); const db = await dbOrThrow();
-      await Promise.all(input.scores.map((score) => db.insert(grades).values({ teachingAssignmentId: input.assignmentId, academicPeriodId: input.periodId, enrollmentId: score.enrollmentId, score: score.score, maximum: score.maximum, status: "draft", enteredByUserId: ctx.user.id }).onDuplicateKeyUpdate({ set: { score: score.score, maximum: score.maximum, status: "draft", enteredByUserId: ctx.user.id } })));
+      for (const score of input.scores) {
+        await db.insert(grades).values({ teachingAssignmentId: input.assignmentId, academicPeriodId: input.periodId, enrollmentId: score.enrollmentId, score: score.score, maximum: score.maximum, status: "draft", enteredByUserId: ctx.user.id }).onDuplicateKeyUpdate({ set: { score: score.score, maximum: score.maximum, status: "draft", enteredByUserId: ctx.user.id } });
+      }
       return { saved: input.scores.length, status: "draft" as const };
     }),
     submit: protectedProcedure.input(teachingInputs.grades).mutation(async ({ ctx, input }) => {
       await assertAssignmentAccess(ctx.user.id, ctx.user.role, input.assignmentId); const db = await dbOrThrow();
-      await Promise.all(input.scores.map((score) => db.insert(grades).values({ teachingAssignmentId: input.assignmentId, academicPeriodId: input.periodId, enrollmentId: score.enrollmentId, score: score.score, maximum: score.maximum, status: "submitted", enteredByUserId: ctx.user.id, submittedAt: new Date() }).onDuplicateKeyUpdate({ set: { score: score.score, maximum: score.maximum, status: "submitted", enteredByUserId: ctx.user.id, submittedAt: new Date() } })));
+      for (const score of input.scores) {
+        await db.insert(grades).values({ teachingAssignmentId: input.assignmentId, academicPeriodId: input.periodId, enrollmentId: score.enrollmentId, score: score.score, maximum: score.maximum, status: "submitted", enteredByUserId: ctx.user.id, submittedAt: new Date() }).onDuplicateKeyUpdate({ set: { score: score.score, maximum: score.maximum, status: "submitted", enteredByUserId: ctx.user.id, submittedAt: new Date() } });
+      }
       return { submitted: input.scores.length, status: "submitted" as const };
     }),
   }),
