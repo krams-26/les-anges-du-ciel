@@ -3,7 +3,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import superjson from "superjson";
 import { users } from "../../drizzle/schema";
-import { getDb } from "../db";
+import { closeDbPool, getDb } from "../db";
 import type { TrpcContext } from "./context";
 
 const t = initTRPC.context<TrpcContext>().create({
@@ -14,11 +14,20 @@ export const router = t.router;
 export const publicProcedure = t.procedure;
 
 async function assertActiveAccount(userId: number) {
-  const db = await getDb();
-  if (!db) return;
-  const [account] = await db.select({ accountStatus: users.accountStatus }).from(users).where(eq(users.id, userId)).limit(1);
-  if (account && account.accountStatus !== "active") {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Ce compte n’est pas actif. Veuillez contacter l’administration." });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const db = await getDb();
+    if (!db) return;
+    try {
+      const [account] = await db.select({ accountStatus: users.accountStatus }).from(users).where(eq(users.id, userId)).limit(1);
+      if (account && account.accountStatus !== "active") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Ce compte n’est pas actif. Veuillez contacter l’administration." });
+      }
+      return;
+    } catch (error) {
+      if (error instanceof TRPCError || attempt === 1) throw error;
+      await closeDbPool();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
   }
 }
 

@@ -82,8 +82,8 @@
 - [x] Étendre le jeu de test avec les classes de 7e, 8e, 1re à 4e scientifiques et littéraires, dix cours et dix élèves par classe.
 - [x] Fiabiliser les écritures groupées de présence et de notes afin d’éviter les expirations de connexion.
 - [x] Fiabiliser le client Drizzle utilisé par les vérifications tRPC afin d’éviter les expirations intermittentes du pool callback.
-- [ ] Réduire et fermer proprement les connexions de vérification afin d’éviter les délais intermittents de la base distante.
-- [ ] Relancer chaque script de vérification après correction et confirmer sa terminaison sans processus résiduel.
+- [x] Réduire et fermer proprement les connexions de vérification afin d’éviter les délais intermittents de la base distante.
+- [x] Relancer chaque script de vérification après correction et confirmer sa terminaison sans processus résiduel.
 - [x] Mettre à niveau le projet avec comptes utilisateurs et base de données de test.
 - [x] Créer les tables et les procédures des dossiers scolaires, classes, cours, enseignants et affectations.
 - [ ] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
