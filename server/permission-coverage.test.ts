@@ -16,6 +16,16 @@ const sensitiveRouters: Record<string, PermissionExpectation[]> = {
     { procedure: "proclaim", resource: "results", action: "validate" },
     { procedure: "archive", resource: "settings", action: "edit" },
   ],
+  "finance.ts": [
+    { procedure: "save", resource: "finance", action: "edit" },
+    { procedure: "configure", resource: "finance", action: "edit" },
+    { procedure: "create", resource: "finance", action: "create" },
+    { procedure: "validate", resource: "finance", action: "validate" },
+    { procedure: "reject", resource: "finance", action: "validate" },
+    { procedure: "cancel", resource: "finance", action: "cancel" },
+    { procedure: "receipt", resource: "finance", action: "print" },
+    { procedure: "export", resource: "finance", action: "export" },
+  ],
   "academic.ts": [
     { procedure: "classResults", resource: "results", action: "view" },
   ],

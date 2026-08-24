@@ -320,17 +320,52 @@ export const enrollmentFinancialAccounts = mysqlTable("enrollment_financial_acco
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => [uniqueIndex("financial_account_enrollment_unique").on(table.enrollmentId)]);
 
+/** Barème annuel en CDF, configurable par section sans modifier les transactions antérieures. */
+export const financeFeeSchedules = mysqlTable("finance_fee_schedules", {
+  id: int("id").autoincrement().primaryKey(),
+  academicYearId: int("academicYearId").notNull(),
+  section: varchar("section", { length: 80 }).notNull(),
+  expectedAmountCdf: int("expectedAmountCdf").notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdByUserId: int("createdByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("finance_fee_schedule_year_section_unique").on(table.academicYearId, table.section), index("finance_fee_schedule_year_index").on(table.academicYearId)]);
+
+/** Taux explicite CDF par USD, versionné par année et figé dans chaque paiement converti. */
+export const financeExchangeRates = mysqlTable("finance_exchange_rates", {
+  id: int("id").autoincrement().primaryKey(),
+  academicYearId: int("academicYearId").notNull(),
+  sourceCurrency: varchar("sourceCurrency", { length: 8 }).default("USD").notNull(),
+  targetCurrency: varchar("targetCurrency", { length: 8 }).default("CDF").notNull(),
+  cdfPerUnit: int("cdfPerUnit").notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdByUserId: int("createdByUserId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [index("finance_exchange_rate_year_index").on(table.academicYearId)]);
+
 export const studentPayments = mysqlTable("student_payments", {
   id: int("id").autoincrement().primaryKey(),
   enrollmentId: int("enrollmentId").notNull(),
   amount: int("amount").notNull(),
   currency: varchar("currency", { length: 8 }).default("CDF").notNull(),
   reference: varchar("reference", { length: 80 }).notNull(),
-  status: mysqlEnum("status", ["pending", "verified", "cancelled", "failed"]).default("pending").notNull(),
+  status: mysqlEnum("status", ["pending", "validated", "rejected", "cancelled", "verified", "failed"]).default("pending").notNull(),
   paidAt: timestamp("paidAt"),
   recordedByUserId: int("recordedByUserId"),
+  payerName: varchar("payerName", { length: 180 }),
+  sourceCurrency: varchar("sourceCurrency", { length: 8 }).default("CDF").notNull(),
+  sourceAmount: int("sourceAmount"),
+  exchangeRateCdfPerUnit: int("exchangeRateCdfPerUnit"),
+  amountBefore: int("amountBefore"),
+  amountAfter: int("amountAfter"),
+  receiptNumber: varchar("receiptNumber", { length: 80 }),
+  validatedByUserId: int("validatedByUserId"),
+  validatedAt: timestamp("validatedAt"),
+  rejectedAt: timestamp("rejectedAt"),
+  cancelledAt: timestamp("cancelledAt"),
+  statusReason: text("statusReason"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (table) => [uniqueIndex("student_payment_reference_unique").on(table.reference), index("student_payments_enrollment_index").on(table.enrollmentId)]);
+}, (table) => [uniqueIndex("student_payment_reference_unique").on(table.reference), uniqueIndex("student_payment_receipt_unique").on(table.receiptNumber), index("student_payments_enrollment_index").on(table.enrollmentId)]);
 
 /** Paramétrage annuel de la deuxième session : les seuils sont explicites et versionnables par année. */
 export const secondSessionSettings = mysqlTable("second_session_settings", {

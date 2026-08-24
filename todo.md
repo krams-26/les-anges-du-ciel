@@ -188,3 +188,12 @@
 - [x] Vérifier e2e une sortie réelle, son audit, l’absence d’inscription suivante et l’enchaînement préparation–admission du même dossier permanent.
 - [x] Vérifier e2e la préparation réelle de la structure cible avant la réinscription explicite du même dossier permanent.
 - [x] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
+
+## Suivi — Module financier
+
+- [x] Auditer les comptes, paiements, permissions et affichages financiers existants.
+- [x] Définir la configuration annuelle des frais, les taux de change historisés et les statuts de paiement.
+- [x] Implémenter les procédures sécurisées de saisie, validation, rejet, annulation, reçu et audit.
+- [x] Étendre les permissions fines finance.view/create/edit/validate/cancel/export/print.
+- [x] Couvrir les paiements, plafonds, statuts, taux et conservation historique par des tests.
+- [ ] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
