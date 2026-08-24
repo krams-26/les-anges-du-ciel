@@ -104,6 +104,11 @@ export const schoolRouter = router({
       await assertPermission(ctx.user.id, "settings", "edit");
       if (input.sourceAcademicYearId === input.targetAcademicYearId) throw new TRPCError({ code: "BAD_REQUEST", message: "Choisissez une année cible distincte." });
       const db = await database();
+      const [sourceYear] = await db.select({ status: academicYears.status }).from(academicYears).where(eq(academicYears.id, input.sourceAcademicYearId)).limit(1);
+      const [targetYear] = await db.select({ status: academicYears.status }).from(academicYears).where(eq(academicYears.id, input.targetAcademicYearId)).limit(1);
+      if (!sourceYear || !targetYear) throw new TRPCError({ code: "NOT_FOUND", message: "Année source ou cible introuvable." });
+      if (sourceYear.status !== "archived") throw new TRPCError({ code: "BAD_REQUEST", message: "L’année source doit être archivée avant la préparation de l’année suivante." });
+      if (targetYear.status !== "draft") throw new TRPCError({ code: "BAD_REQUEST", message: "L’année cible doit être au statut brouillon avant sa préparation." });
       const sourceClasses = await db.select().from(classes).where(eq(classes.academicYearId, input.sourceAcademicYearId));
       if (!sourceClasses.length) throw new TRPCError({ code: "NOT_FOUND", message: "Aucune classe source à préparer." });
       const targetClasses = await db.select({ id: classes.id }).from(classes).where(eq(classes.academicYearId, input.targetAcademicYearId)).limit(1);

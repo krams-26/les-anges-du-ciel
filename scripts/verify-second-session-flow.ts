@@ -1,5 +1,7 @@
 import { appRouter } from "../server/routers";
-import { closeDbPool } from "../server/db";
+import { closeDbPool, getDb } from "../server/db";
+import { auditEvents } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 let completed = false;
 
@@ -13,8 +15,19 @@ try {
   const evaluation = await caller.secondSession.candidates.evaluate({ settingId: setting.id });
   const candidates = await caller.secondSession.candidates.list({ settingId: setting.id });
   const selectedCandidate = candidates[0];
-  if (!selectedCandidate) throw new Error("Aucun candidat de test généré.");
-  await caller.secondSession.candidates.setStatus({ candidateId: selectedCandidate.id, status: "registered", reason: "Inscription de test en deuxième session" });
+  const completedCandidate = candidates[1];
+  if (!selectedCandidate || !completedCandidate) throw new Error("Deux candidats de test sont nécessaires.");
+  await caller.secondSession.candidates.setStatus({ candidateId: selectedCandidate.id, status: "absent", reason: "Absence constatée lors des épreuves de deuxième session" });
+  const completedContext = await caller.secondSession.assessments.context({ candidateId: completedCandidate.id });
+  for (const course of completedContext.courses) await caller.secondSession.assessments.save({ candidateId: completedCandidate.id, classCourseId: course.classCourseId, score: 0, status: "validated" });
+  await caller.secondSession.candidates.setStatus({ candidateId: completedCandidate.id, status: "completed", reason: "Toutes les épreuves de deuxième session ont été validées." });
+  const refreshedCandidates = await caller.secondSession.candidates.list({ settingId: setting.id });
+  if (refreshedCandidates.find((candidate) => candidate.id === selectedCandidate.id)?.status !== "absent" || refreshedCandidates.find((candidate) => candidate.id === completedCandidate.id)?.status !== "completed") throw new Error("Les statuts absent et terminé n’ont pas été persistés.");
+  const db = await getDb();
+  if (!db) throw new Error("Base de données indisponible pour la vérification des audits.");
+  const absentAudits = await db.select({ afterState: auditEvents.afterState }).from(auditEvents).where(eq(auditEvents.resourceId, selectedCandidate.id));
+  const completedAudits = await db.select({ afterState: auditEvents.afterState }).from(auditEvents).where(eq(auditEvents.resourceId, completedCandidate.id));
+  if (!absentAudits.some((audit) => audit.afterState?.includes('"status":"absent"')) || !completedAudits.some((audit) => audit.afterState?.includes('"status":"completed"'))) throw new Error("Audit de statut absent ou terminé introuvable.");
   const session = await caller.secondSession.deliberation.createSession({ academicYearId: 1, label: sessionLabel });
   const initialized = await caller.secondSession.deliberation.initialize({ sessionId: session.id });
   const decisions = await caller.secondSession.deliberation.decisions({ sessionId: session.id });
@@ -30,7 +43,7 @@ try {
   await caller.secondSession.deliberation.rectify({ decisionId: proposed.id, decision: "admitted", basis: "manual", finalAverage: proposed.finalAverage, rationale: "Rectification fonctionnelle de test." });
   const afterRectification = await caller.secondSession.deliberation.history({ decisionId: proposed.id });
   if (!afterRectification.some((event) => event.action === "rectified")) throw new Error("Audit de rectification introuvable.");
-  console.log(JSON.stringify({ verified: true, settingId: setting.id, evaluated: evaluation.processed, candidates: candidates.length, decisions: initialized.initialized, validatedDecisionId: proposed.id, auditActions: afterRectification.map((event) => event.action) }, null, 2));
+  console.log(JSON.stringify({ verified: true, settingId: setting.id, evaluated: evaluation.processed, candidates: candidates.length, absentCandidateId: selectedCandidate.id, completedCandidateId: completedCandidate.id, statusAuditsVerified: true, decisions: initialized.initialized, validatedDecisionId: proposed.id, auditActions: afterRectification.map((event) => event.action) }, null, 2));
   completed = true;
 } finally {
   await closeDbPool();

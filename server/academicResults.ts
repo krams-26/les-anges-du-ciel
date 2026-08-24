@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { academicPeriods, classCourses, classes, courses, enrollments, grades, teachingAssignments } from "../drizzle/schema";
+import { academicPeriods, academicYears, classCourses, classes, courses, enrollments, grades, teachingAssignments } from "../drizzle/schema";
 import { getDb } from "./db";
 import { calculateAcademicResult, maximumForConfiguredCoursePeriod, type AcademicScope, type AcademicResult, type AcademicPeriod, type ClassCourseConfiguration, type AcademicGrade } from "./academicEngine";
 
@@ -11,6 +11,10 @@ export function enrollmentMatchesTeachingContext(assignment: { classId: number; 
 
 export function periodMatchesTeachingContext(assignment: { academicYearId: number }, period: { academicYearId: number }) {
   return period.academicYearId === assignment.academicYearId;
+}
+
+export function canWriteAcademicYear(status: "draft" | "active" | "notes_closed" | "proclaimed" | "archived") {
+  return status !== "proclaimed" && status !== "archived";
 }
 
 function toPeriods(rows: { id: number; code: string; kind: "period" | "exam" | "semester" | "annual"; sequence: number }[]): AcademicPeriod[] {
@@ -28,8 +32,8 @@ function toCourseConfigurations(rows: { id: number; classId: number; courseId: n
 
 /** Vérifie l’affectation active et, le cas échéant, l’appartenance des élèves à sa classe et à son année. */
 export async function getTeachingAssignmentContext(db: Database, assignmentId: number, enrollmentIds: number[] = []) {
-  const [assignment] = await db.select({ classId: classes.id, academicYearId: classes.academicYearId, periodWeight: classCourses.periodWeight, classCourseId: classCourses.id }).from(teachingAssignments).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).where(eq(teachingAssignments.id, assignmentId)).limit(1);
-  if (!assignment) return null;
+  const [assignment] = await db.select({ classId: classes.id, academicYearId: classes.academicYearId, yearStatus: academicYears.status, periodWeight: classCourses.periodWeight, classCourseId: classCourses.id }).from(teachingAssignments).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).innerJoin(academicYears, eq(classes.academicYearId, academicYears.id)).where(eq(teachingAssignments.id, assignmentId)).limit(1);
+  if (!assignment || !canWriteAcademicYear(assignment.yearStatus)) return null;
   if (enrollmentIds.length) {
     const allowed = await db.select({ id: enrollments.id, classId: enrollments.classId, academicYearId: enrollments.academicYearId, status: enrollments.status }).from(enrollments).where(inArray(enrollments.id, enrollmentIds));
     if (allowed.length !== Array.from(new Set(enrollmentIds)).length || !allowed.every((enrollment) => enrollmentMatchesTeachingContext(assignment, enrollment))) return null;

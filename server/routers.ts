@@ -10,6 +10,7 @@ import { secondSessionRouter } from "./routers/secondSession";
 import { personalRouter } from "./routers/personal";
 import { annualControlRouter } from "./routers/annualControl";
 import { academicRouter } from "./routers/academic";
+import { annualCycleRouter } from "./routers/annualCycle";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -32,6 +33,7 @@ export const appRouter = router({
   personal: personalRouter,
   annualControl: annualControlRouter,
   academic: academicRouter,
+  annualCycle: annualCycleRouter,
 
   // TODO: add feature routers here, e.g.
   // todo: router({

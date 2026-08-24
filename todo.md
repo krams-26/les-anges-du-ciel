@@ -163,3 +163,16 @@
 - [x] Centraliser la validation serveur affectation–classe–cours–élève–année pour chaque opération pédagogique.
 - [x] Ajouter les tests de refus interclasse, intercours et interannées, ainsi que les cas autorisés enseignant et administrateur.
 - [x] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
+
+## Suivi — Cycle académique annuel
+
+- [x] Auditer les états annuels, périodes, deuxième session, délibération, préparation et archivage existants.
+- [x] Définir les transitions persistantes et configurables de clôture, proclamation, archivage et préparation annuelle.
+- [x] Ajouter les statuts de deuxième session et les règles de délibération globale ou individuelle auditables.
+- [x] Empêcher les proclamations prématurées, les modifications silencieuses et la perte d’historique.
+- [x] Couvrir les transitions, exclusions de réinscription et règles de sécurité par des tests.
+- [x] Permettre les statuts de deuxième session « absent » et « completed » via les procédures métier et leurs audits.
+- [x] Tester le traitement des candidats absents ou terminés et la délibération individuelle exigée avant proclamation.
+- [x] Vérifier e2e le refus puis l’autorisation de proclamation autour d’une délibération individuelle requise.
+- [x] Vérifier e2e les audits produits par les statuts absent et terminé de deuxième session.
+- [ ] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
