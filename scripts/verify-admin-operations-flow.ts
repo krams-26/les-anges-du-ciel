@@ -9,6 +9,8 @@ try {
   const years = await caller.school.years.list();
   const year = years[0];
   if (!year) throw new Error("Aucune année scolaire disponible.");
+  const annualSummary = await caller.annualControl.summary({ academicYearId: year.id });
+  if (annualSummary.year.id !== year.id || annualSummary.enrollmentCount < 0) throw new Error("Synthèse annuelle incohérente.");
 
   const className = `Audit ${String(stamp).slice(-6)}`;
   await caller.school.classes.create({ academicYearId: year.id, section: "Secondaire", level: "Audit", name: className });
@@ -36,7 +38,7 @@ try {
   if (!permissionState.overrides.some((item) => item.resource === "students" && item.action === "view" && item.allowed)) throw new Error("Dérogation de gouvernance introuvable.");
   await caller.governance.permissions.resetOverride({ userId: 600005, resource: "students", action: "view" });
 
-  console.log(JSON.stringify({ verified: true, academicYearId: year.id, classId: createdClass.id, courseId: createdCourse.id, teacherId: teacher.id, assignmentId: assignment.id, governanceOverrideReset: true }, null, 2));
+  console.log(JSON.stringify({ verified: true, academicYearId: year.id, enrollmentCount: annualSummary.enrollmentCount, classId: createdClass.id, courseId: createdCourse.id, teacherId: teacher.id, assignmentId: assignment.id, governanceOverrideReset: true }, null, 2));
   completed = true;
 } finally {
   await closeDbPool();
