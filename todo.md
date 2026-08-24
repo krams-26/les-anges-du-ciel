@@ -162,4 +162,4 @@
 - [x] Auditer les procédures tRPC de notes, présences, évaluations, rapports, cours et élèves.
 - [x] Centraliser la validation serveur affectation–classe–cours–élève–année pour chaque opération pédagogique.
 - [x] Ajouter les tests de refus interclasse, intercours et interannées, ainsi que les cas autorisés enseignant et administrateur.
-- [ ] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
+- [x] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
