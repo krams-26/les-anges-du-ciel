@@ -3,6 +3,9 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { academicPeriods, attendanceRecords, attendanceSessions, classCourses, classes, courses, enrollments, grades, students, teacherReports, teachers, teachingAssignments } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { getGradeWriteContext } from "../academicResults";
+import { getAcademicResultsForYear } from "../academicResults";
+import { maximumForConfiguredCoursePeriod, rankAcademicResults } from "../academicEngine";
 import { assertPermission } from "../permissions";
 import { protectedProcedure, router } from "../_core/trpc";
 
@@ -25,7 +28,7 @@ async function assertAssignmentAccess(userId: number, userRole: "user" | "admin"
 
 export const teachingInputs = {
   attendance: z.object({ assignmentId: z.number().int().positive(), sessionDate: z.coerce.date(), records: z.array(z.object({ enrollmentId: z.number().int().positive(), status: z.enum(["present", "absent", "late", "excused"]), note: z.string().trim().max(500).optional() })).min(1) }),
-  grades: z.object({ assignmentId: z.number().int().positive(), periodId: z.number().int().positive(), scores: z.array(z.object({ enrollmentId: z.number().int().positive(), score: z.number().int().min(0), maximum: z.number().int().min(1).max(100) })).min(1) }).refine((value) => value.scores.every((score) => score.score <= score.maximum), { message: "Une note ne peut pas dépasser son maximum." }),
+  grades: z.object({ assignmentId: z.number().int().positive(), periodId: z.number().int().positive(), scores: z.array(z.object({ enrollmentId: z.number().int().positive(), score: z.number().int().min(0), maximum: z.number().int().min(1).max(100).optional() })).min(1) }).refine((value) => value.scores.every((score) => score.maximum === undefined || score.score <= score.maximum), { message: "Une note ne peut pas dépasser le maximum indiqué.", path: ["scores"] }),
 };
 
 export const teachingRouter = router({
@@ -48,7 +51,18 @@ export const teachingRouter = router({
     await assertAssignmentAccess(ctx.user.id, ctx.user.role, input.assignmentId);
     await assertPermission(ctx.user.id, "grades", "view");
     const db = await dbOrThrow();
-    return db.select({ id: academicPeriods.id, code: academicPeriods.code, label: academicPeriods.label, startsAt: academicPeriods.startsAt, endsAt: academicPeriods.endsAt }).from(teachingAssignments).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).innerJoin(academicPeriods, eq(classes.academicYearId, academicPeriods.academicYearId)).where(eq(teachingAssignments.id, input.assignmentId));
+    const periods = await db.select({ id: academicPeriods.id, code: academicPeriods.code, label: academicPeriods.label, kind: academicPeriods.kind, sequence: academicPeriods.sequence, startsAt: academicPeriods.startsAt, endsAt: academicPeriods.endsAt, periodWeight: classCourses.periodWeight }).from(teachingAssignments).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).innerJoin(academicPeriods, eq(classes.academicYearId, academicPeriods.academicYearId)).where(eq(teachingAssignments.id, input.assignmentId));
+    return periods.flatMap((period) => { const maximum = maximumForConfiguredCoursePeriod(period.periodWeight, period); return maximum ? [{ ...period, maximum }] : []; });
+  }),
+  academicResults: protectedProcedure.input(z.object({ assignmentId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+    await assertAssignmentAccess(ctx.user.id, ctx.user.role, input.assignmentId);
+    await assertPermission(ctx.user.id, "results", "view");
+    const db = await dbOrThrow();
+    const [assignment] = await db.select({ classId: classes.id, academicYearId: classes.academicYearId }).from(teachingAssignments).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).where(eq(teachingAssignments.id, input.assignmentId)).limit(1);
+    if (!assignment) throw new TRPCError({ code: "NOT_FOUND", message: "Affectation introuvable." });
+    const classEnrollments = await db.select({ id: enrollments.id, firstName: students.firstName, lastName: students.lastName, studentCode: students.studentCode }).from(enrollments).innerJoin(students, eq(enrollments.studentId, students.id)).where(and(eq(enrollments.classId, assignment.classId), eq(enrollments.academicYearId, assignment.academicYearId), eq(enrollments.status, "active")));
+    const enrollmentById = new Map(classEnrollments.map((enrollment) => [enrollment.id, enrollment]));
+    return rankAcademicResults(await getAcademicResultsForYear(db, assignment.academicYearId, { type: "annual" })).filter((result) => enrollmentById.has(result.enrollmentId)).map((result) => ({ ...result, student: enrollmentById.get(result.enrollmentId)! }));
   }),
   attendance: router({
     save: protectedProcedure.input(teachingInputs.attendance).mutation(async ({ ctx, input }) => {
@@ -65,15 +79,21 @@ export const teachingRouter = router({
   grades: router({
     saveDraft: protectedProcedure.input(teachingInputs.grades).mutation(async ({ ctx, input }) => {
       await assertAssignmentAccess(ctx.user.id, ctx.user.role, input.assignmentId); await assertPermission(ctx.user.id, "grades", "edit"); const db = await dbOrThrow();
+      const context = await getGradeWriteContext(db, input.assignmentId, input.periodId, input.scores.map((score) => score.enrollmentId));
+      if (!context) throw new TRPCError({ code: "BAD_REQUEST", message: "La période, la classe ou les élèves ne correspondent pas à cette affectation annuelle." });
+      if (input.scores.some((score) => score.score > context.maximum)) throw new TRPCError({ code: "BAD_REQUEST", message: `La note ne peut pas dépasser ${context.maximum} points pour cette période.` });
       for (const score of input.scores) {
-        await db.insert(grades).values({ teachingAssignmentId: input.assignmentId, academicPeriodId: input.periodId, enrollmentId: score.enrollmentId, score: score.score, maximum: score.maximum, status: "draft", enteredByUserId: ctx.user.id }).onDuplicateKeyUpdate({ set: { score: score.score, maximum: score.maximum, status: "draft", enteredByUserId: ctx.user.id } });
+        await db.insert(grades).values({ teachingAssignmentId: input.assignmentId, academicPeriodId: input.periodId, enrollmentId: score.enrollmentId, score: score.score, maximum: context.maximum, status: "draft", enteredByUserId: ctx.user.id }).onDuplicateKeyUpdate({ set: { score: score.score, maximum: context.maximum, status: "draft", enteredByUserId: ctx.user.id } });
       }
       return { saved: input.scores.length, status: "draft" as const };
     }),
     submit: protectedProcedure.input(teachingInputs.grades).mutation(async ({ ctx, input }) => {
       await assertAssignmentAccess(ctx.user.id, ctx.user.role, input.assignmentId); await assertPermission(ctx.user.id, "grades", "edit"); const db = await dbOrThrow();
+      const context = await getGradeWriteContext(db, input.assignmentId, input.periodId, input.scores.map((score) => score.enrollmentId));
+      if (!context) throw new TRPCError({ code: "BAD_REQUEST", message: "La période, la classe ou les élèves ne correspondent pas à cette affectation annuelle." });
+      if (input.scores.some((score) => score.score > context.maximum)) throw new TRPCError({ code: "BAD_REQUEST", message: `La note ne peut pas dépasser ${context.maximum} points pour cette période.` });
       for (const score of input.scores) {
-        await db.insert(grades).values({ teachingAssignmentId: input.assignmentId, academicPeriodId: input.periodId, enrollmentId: score.enrollmentId, score: score.score, maximum: score.maximum, status: "submitted", enteredByUserId: ctx.user.id, submittedAt: new Date() }).onDuplicateKeyUpdate({ set: { score: score.score, maximum: score.maximum, status: "submitted", enteredByUserId: ctx.user.id, submittedAt: new Date() } });
+        await db.insert(grades).values({ teachingAssignmentId: input.assignmentId, academicPeriodId: input.periodId, enrollmentId: score.enrollmentId, score: score.score, maximum: context.maximum, status: "submitted", enteredByUserId: ctx.user.id, submittedAt: new Date() }).onDuplicateKeyUpdate({ set: { score: score.score, maximum: context.maximum, status: "submitted", enteredByUserId: ctx.user.id, submittedAt: new Date() } });
       }
       return { submitted: input.scores.length, status: "submitted" as const };
     }),

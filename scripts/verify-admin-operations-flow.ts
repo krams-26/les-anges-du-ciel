@@ -1,5 +1,7 @@
 import { appRouter } from "../server/routers";
-import { closeDbPool } from "../server/db";
+import { closeDbPool, getDb } from "../server/db";
+import { academicPeriods } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 const caller = appRouter.createCaller({ user: { id: 1, openId: "test-admin", name: "Administrateur de test", email: null, loginMethod: "test", role: "admin", accountStatus: "active", accessRoleId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as never, res: {} as never });
 const stamp = Date.now();
@@ -9,6 +11,10 @@ try {
   const years = await caller.school.years.list();
   const year = years[0];
   if (!year) throw new Error("Aucune année scolaire disponible.");
+  await caller.school.years.ensurePeriods({ academicYearId: year.id });
+  const periods = await (await getDb())?.select({ code: academicPeriods.code }).from(academicPeriods).where(eq(academicPeriods.academicYearId, year.id));
+  const requiredPeriods = ["P1", "P2", "EX1", "P3", "P4", "EX2"];
+  if (!requiredPeriods.every((code) => periods?.some((period) => period.code === code))) throw new Error("Calendrier académique annuel incomplet.");
   const annualSummary = await caller.annualControl.summary({ academicYearId: year.id });
   if (annualSummary.year.id !== year.id || annualSummary.enrollmentCount < 0) throw new Error("Synthèse annuelle incohérente.");
 
@@ -38,7 +44,7 @@ try {
   if (!permissionState.overrides.some((item) => item.resource === "students" && item.action === "view" && item.allowed)) throw new Error("Dérogation de gouvernance introuvable.");
   await caller.governance.permissions.resetOverride({ userId: 600005, resource: "students", action: "view" });
 
-  console.log(JSON.stringify({ verified: true, academicYearId: year.id, enrollmentCount: annualSummary.enrollmentCount, classId: createdClass.id, courseId: createdCourse.id, teacherId: teacher.id, assignmentId: assignment.id, governanceOverrideReset: true }, null, 2));
+  console.log(JSON.stringify({ verified: true, academicYearId: year.id, academicPeriods: requiredPeriods, enrollmentCount: annualSummary.enrollmentCount, classId: createdClass.id, courseId: createdCourse.id, teacherId: teacher.id, assignmentId: assignment.id, governanceOverrideReset: true }, null, 2));
   completed = true;
 } finally {
   await closeDbPool();

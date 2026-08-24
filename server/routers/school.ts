@@ -2,6 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
+  academicPeriods,
   academicYears,
   auditEvents,
   classCourses,
@@ -16,6 +17,7 @@ import {
   users,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { institutionalPeriodDefinitions } from "../academicEngine";
 import { assertPermission } from "../permissions";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 
@@ -82,7 +84,21 @@ export const schoolRouter = router({
       const db = await database();
       await db.insert(academicYears).values({ ...input, status: "draft" });
       const [created] = await db.select({ id: academicYears.id }).from(academicYears).where(eq(academicYears.code, input.code)).limit(1);
+      if (created) await db.insert(academicPeriods).values(institutionalPeriodDefinitions.map((period) => ({ academicYearId: created.id, ...period, status: "draft" as const })));
+      if (created) await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "academic_year_created", module: "school", resourceType: "academic_year", resourceId: created.id, afterState: JSON.stringify({ code: input.code, periods: institutionalPeriodDefinitions.map((period) => period.code) }) });
       return { ok: true, id: created?.id };
+    }),
+    ensurePeriods: adminProcedure.input(z.object({ academicYearId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "settings", "edit");
+      const db = await database();
+      const [year] = await db.select({ id: academicYears.id }).from(academicYears).where(eq(academicYears.id, input.academicYearId)).limit(1);
+      if (!year) throw new TRPCError({ code: "NOT_FOUND", message: "Année scolaire introuvable." });
+      const existing = await db.select({ code: academicPeriods.code }).from(academicPeriods).where(eq(academicPeriods.academicYearId, input.academicYearId));
+      const existingCodes = new Set(existing.map((period) => period.code));
+      const missing = institutionalPeriodDefinitions.filter((period) => !existingCodes.has(period.code));
+      if (missing.length) await db.insert(academicPeriods).values(missing.map((period) => ({ academicYearId: input.academicYearId, ...period, status: "draft" as const })));
+      await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "academic_periods_ensured", module: "school", resourceType: "academic_year", resourceId: input.academicYearId, afterState: JSON.stringify({ inserted: missing.map((period) => period.code) }) });
+      return { inserted: missing.length, periods: missing.map((period) => period.code) };
     }),
     prepare: adminProcedure.input(schoolInputs.annualPrepare).mutation(async ({ ctx, input }) => {
       await assertPermission(ctx.user.id, "settings", "edit");

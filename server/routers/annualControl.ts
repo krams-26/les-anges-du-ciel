@@ -4,6 +4,7 @@ import { z } from "zod";
 import { academicYears, classes, deliberationDecisions, deliberationSessions, enrollmentFinancialAccounts, enrollments, grades, secondSessionSettings, teacherReports, teachingAssignments, classCourses } from "../../drizzle/schema";
 import { adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { getAcademicResultsForYear } from "../academicResults";
 import { assertPermission } from "../permissions";
 
 async function database() {
@@ -34,6 +35,9 @@ export const annualControlRouter = router({
     const [finance] = await db.select({ expected: sum(enrollmentFinancialAccounts.expectedAmount), paid: sum(enrollmentFinancialAccounts.paidAmount) }).from(enrollmentFinancialAccounts).innerJoin(enrollments, eq(enrollmentFinancialAccounts.enrollmentId, enrollments.id)).innerJoin(classes, eq(enrollments.classId, classes.id)).where(yearCondition);
     const decisions = await db.select({ status: deliberationDecisions.status, total: count() }).from(deliberationDecisions).innerJoin(deliberationSessions, eq(deliberationDecisions.deliberationSessionId, deliberationSessions.id)).where(eq(deliberationSessions.academicYearId, input.academicYearId)).groupBy(deliberationDecisions.status);
     const [setting] = await db.select({ id: secondSessionSettings.id, status: secondSessionSettings.status, thresholdPercent: secondSessionSettings.thresholdPercent, registrationDeadline: secondSessionSettings.registrationDeadline, examStartsAt: secondSessionSettings.examStartsAt, examEndsAt: secondSessionSettings.examEndsAt }).from(secondSessionSettings).where(eq(secondSessionSettings.academicYearId, input.academicYearId)).limit(1);
+    const academicResults = await getAcademicResultsForYear(db, input.academicYearId, { type: "annual" });
+    const comparablePercentages = academicResults.flatMap((result) => result.percentage === null ? [] : [result.percentage]);
+    const academicAverage = comparablePercentages.length ? Math.round((comparablePercentages.reduce((total, percentage) => total + percentage, 0) / comparablePercentages.length) * 100) / 100 : null;
     const decisionCounts = Object.fromEntries(decisions.map((item) => [item.status, numeric(item.total)]));
     const expectedAmount = numeric(finance?.expected);
     const paidAmount = numeric(finance?.paid);
@@ -42,6 +46,7 @@ export const annualControlRouter = router({
       enrollmentCount: numeric(enrollmentsTotal?.total),
       grades: { draft: numeric(gradesDraft?.total), submitted: numeric(gradesSubmitted?.total), validated: numeric(gradesValidated?.total) },
       reports: { draft: numeric(reportsDraft?.total), submitted: numeric(reportsSubmitted?.total), validated: numeric(reportsValidated?.total) },
+      academic: { comparableEnrollments: comparablePercentages.length, completedEnrollments: academicResults.filter((result) => result.status === "complete").length, averagePercentage: academicAverage, highestPercentage: comparablePercentages.length ? Math.max(...comparablePercentages) : null },
       finance: { expectedAmount, paidAmount, remainingAmount: Math.max(0, expectedAmount - paidAmount), collectionRate: expectedAmount ? Math.round((paidAmount / expectedAmount) * 1000) / 10 : 0 },
       decisions: { draft: decisionCounts.draft ?? 0, proposed: decisionCounts.proposed ?? 0, validated: decisionCounts.validated ?? 0 },
       secondSession: setting ?? null,

@@ -21,6 +21,7 @@ import {
   userNotifications,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { getAcademicProgressionForEnrollment, getAcademicResultForEnrollment } from "../academicResults";
 import { assertPermission } from "../permissions";
 import { protectedProcedure, router } from "../_core/trpc";
 
@@ -88,14 +89,10 @@ export const parentRouter = router({
     const access = await assertParentEnrollment(ctx.user.id, input.enrollmentId);
     if (!access.canViewResults) throw new TRPCError({ code: "FORBIDDEN", message: "La consultation des résultats n’est pas autorisée pour ce responsable." });
     const db = await database();
-    const resultRows = await db.select({ courseName: courses.name, courseCode: courses.code, score: grades.score, maximum: grades.maximum, periodId: academicPeriods.id, periodCode: academicPeriods.code, periodLabel: academicPeriods.label }).from(grades)
-      .innerJoin(teachingAssignments, eq(grades.teachingAssignmentId, teachingAssignments.id))
-      .innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id))
-      .innerJoin(courses, eq(classCourses.courseId, courses.id))
-      .innerJoin(academicPeriods, eq(grades.academicPeriodId, academicPeriods.id))
-      .where(and(eq(grades.enrollmentId, input.enrollmentId), eq(grades.status, "validated"), input.periodId ? eq(grades.academicPeriodId, input.periodId) : undefined))
-      .orderBy(asc(courses.name));
-    return resultRows;
+    const result = await getAcademicResultForEnrollment(db, input.enrollmentId, input.periodId ? { type: "period", periodId: input.periodId } : { type: "annual" });
+    if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Le contexte annuel de ce dossier est incomplet." });
+    const progression = await getAcademicProgressionForEnrollment(db, input.enrollmentId);
+    return { result, progression };
   }),
   attendance: protectedProcedure.input(z.object({ enrollmentId: z.number().int().positive(), month: z.string().regex(/^\d{4}-\d{2}$/).optional() })).query(async ({ ctx, input }) => {
     parentOnly(ctx.user.role);

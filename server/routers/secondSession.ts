@@ -3,6 +3,8 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { academicYears, auditEvents, classCourses, classes, courses, deliberationAudits, deliberationDecisions, deliberationSessions, enrollments, grades, secondSessionAssessments, secondSessionCandidates, secondSessionSettings, students, users } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { getAcademicResultsForYear } from "../academicResults";
+import { calculateSecondSessionResult, maximumForConfiguredCoursePeriod } from "../academicEngine";
 import { assertPermission } from "../permissions";
 import { adminProcedure, router } from "../_core/trpc";
 
@@ -15,7 +17,7 @@ async function database() {
 const dateInput = z.coerce.date().optional().nullable();
 const decisionEnum = z.enum(["pending", "admitted", "referred", "repeat", "withdrawn"]);
 export const secondSessionInputs = {
-  assessment: z.object({ candidateId: z.number().int().positive(), classCourseId: z.number().int().positive(), score: z.number().int().min(0), maximum: z.number().int().positive(), status: z.enum(["draft", "submitted", "validated"]) }).refine((value) => value.score <= value.maximum, { message: "La note ne peut pas dépasser le maximum.", path: ["score"] }),
+  assessment: z.object({ candidateId: z.number().int().positive(), classCourseId: z.number().int().positive(), score: z.number().int().min(0), maximum: z.number().int().positive().optional(), status: z.enum(["draft", "submitted", "validated"]) }).refine((value) => value.maximum === undefined || value.score <= value.maximum, { message: "La note ne peut pas dépasser le maximum indiqué.", path: ["score"] }),
 };
 export const canValidateDeliberation = (status: "draft" | "proposed" | "validated") => status === "proposed";
 
@@ -46,13 +48,13 @@ export const secondSessionRouter = router({
       const [setting] = await db.select().from(secondSessionSettings).where(eq(secondSessionSettings.id, input.settingId)).limit(1);
       if (!setting) throw new TRPCError({ code: "NOT_FOUND", message: "Configuration de deuxième session introuvable." });
       const yearEnrollments = await db.select({ id: enrollments.id }).from(enrollments).innerJoin(classes, eq(enrollments.classId, classes.id)).where(and(eq(classes.academicYearId, setting.academicYearId), eq(enrollments.status, "active")));
+      const annualResults = await getAcademicResultsForYear(db, setting.academicYearId, { type: "annual" });
+      const resultByEnrollment = new Map(annualResults.map((result) => [result.enrollmentId, result]));
       let processed = 0;
       for (const enrollment of yearEnrollments) {
-        const rows = await db.select({ score: grades.score, maximum: grades.maximum }).from(grades).where(and(eq(grades.enrollmentId, enrollment.id), eq(grades.status, "validated")));
-        const obtained = rows.reduce((sum, grade) => sum + grade.score, 0);
-        const total = rows.reduce((sum, grade) => sum + grade.maximum, 0);
-        const average = total ? Math.round((obtained / total) * 100) : null;
-        const eligible = setting.eligibilityMode === "manual" ? false : setting.eligibilityMode === "unvalidated" ? !rows.length : average === null || average < setting.thresholdPercent;
+        const result = resultByEnrollment.get(enrollment.id);
+        const average = result?.percentage ?? null;
+        const eligible = setting.eligibilityMode === "manual" ? false : setting.eligibilityMode === "unvalidated" ? result?.status !== "complete" : average === null || average < setting.thresholdPercent;
         const reason = setting.eligibilityMode === "manual" ? "Évaluation manuelle requise" : average === null ? "Aucun résultat validé disponible" : `Moyenne calculée : ${average} % (seuil ${setting.thresholdPercent} %)`;
         await db.insert(secondSessionCandidates).values({ secondSessionSettingId: setting.id, enrollmentId: enrollment.id, status: eligible ? "eligible" : "ineligible", calculatedAverage: average, eligibilityReason: reason, decidedByUserId: ctx.user.id, decidedAt: new Date() }).onDuplicateKeyUpdate({ set: { status: eligible ? "eligible" : "ineligible", calculatedAverage: average, eligibilityReason: reason, decidedByUserId: ctx.user.id, decidedAt: new Date() } });
         processed += 1;
@@ -72,8 +74,15 @@ export const secondSessionRouter = router({
     save: adminProcedure.input(secondSessionInputs.assessment).mutation(async ({ ctx, input }) => {
       await assertPermission(ctx.user.id, "grades", "edit");
       const db = await database();
-      await db.insert(secondSessionAssessments).values({ ...input, enteredByUserId: ctx.user.id, submittedAt: input.status === "draft" ? null : new Date() }).onDuplicateKeyUpdate({ set: { score: input.score, maximum: input.maximum, status: input.status, enteredByUserId: ctx.user.id, submittedAt: input.status === "draft" ? null : new Date() } });
-      await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "second_session_assessment_saved", module: "second_session", resourceType: "candidate", resourceId: input.candidateId, afterState: JSON.stringify(input) });
+      const [candidate] = await db.select({ enrollmentId: secondSessionCandidates.enrollmentId, academicYearId: secondSessionSettings.academicYearId, classId: enrollments.classId }).from(secondSessionCandidates).innerJoin(secondSessionSettings, eq(secondSessionCandidates.secondSessionSettingId, secondSessionSettings.id)).innerJoin(enrollments, eq(secondSessionCandidates.enrollmentId, enrollments.id)).where(eq(secondSessionCandidates.id, input.candidateId)).limit(1);
+      if (!candidate?.classId) throw new TRPCError({ code: "NOT_FOUND", message: "Candidat de deuxième session introuvable." });
+      const [configuration] = await db.select({ classId: classCourses.classId, periodWeight: classCourses.periodWeight }).from(classCourses).where(eq(classCourses.id, input.classCourseId)).limit(1);
+      if (!configuration || configuration.classId !== candidate.classId) throw new TRPCError({ code: "BAD_REQUEST", message: "Le cours choisi ne correspond pas à la classe annuelle du candidat." });
+      const maximum = maximumForConfiguredCoursePeriod(configuration.periodWeight, { kind: "exam" });
+      if (!maximum || input.score > maximum) throw new TRPCError({ code: "BAD_REQUEST", message: `La note de deuxième session ne peut pas dépasser ${maximum ?? 0} points.` });
+      const values = { candidateId: input.candidateId, classCourseId: input.classCourseId, score: input.score, maximum, status: input.status, enteredByUserId: ctx.user.id, submittedAt: input.status === "draft" ? null : new Date() };
+      await db.insert(secondSessionAssessments).values(values).onDuplicateKeyUpdate({ set: { score: values.score, maximum: values.maximum, status: values.status, enteredByUserId: values.enteredByUserId, submittedAt: values.submittedAt } });
+      await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "second_session_assessment_saved", module: "second_session", resourceType: "candidate", resourceId: input.candidateId, afterState: JSON.stringify(values) });
       return { ok: true };
     }),
     summary: adminProcedure.input(z.object({ candidateId: z.number().int().positive() })).query(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "results", "view"); return (await database()).select().from(secondSessionAssessments).where(eq(secondSessionAssessments.candidateId, input.candidateId)); }),
@@ -84,8 +93,9 @@ export const secondSessionRouter = router({
       if (!candidate) throw new TRPCError({ code: "NOT_FOUND", message: "Candidat de deuxième session introuvable." });
       const configuredCourses = await db.select({ classCourseId: classCourses.id, courseCode: courses.code, courseName: courses.name, periodWeight: classCourses.periodWeight }).from(classCourses).innerJoin(courses, eq(classCourses.courseId, courses.id)).where(eq(classCourses.classId, Number(candidate.classId))).orderBy(asc(courses.name));
       const assessments = await db.select().from(secondSessionAssessments).where(eq(secondSessionAssessments.candidateId, input.candidateId));
+      const secondSessionResult = calculateSecondSessionResult({ enrollmentId: candidate.enrollmentId, classCourses: configuredCourses.map((course) => ({ id: course.classCourseId, courseId: course.classCourseId, courseCode: course.courseCode, courseName: course.courseName, periodWeight: course.periodWeight, status: "configured" as const })), assessments: assessments.map((assessment) => ({ enrollmentId: candidate.enrollmentId, classCourseId: assessment.classCourseId, score: assessment.score, status: assessment.status })) });
       const [finalDecision] = await db.select({ decision: deliberationDecisions.decision, status: deliberationDecisions.status, basis: deliberationDecisions.basis, finalAverage: deliberationDecisions.finalAverage, sessionLabel: deliberationSessions.label }).from(deliberationDecisions).innerJoin(deliberationSessions, eq(deliberationDecisions.deliberationSessionId, deliberationSessions.id)).where(and(eq(deliberationDecisions.enrollmentId, candidate.enrollmentId), eq(deliberationDecisions.status, "validated"))).orderBy(desc(deliberationDecisions.validatedAt)).limit(1);
-      return { candidate, finalDecision: finalDecision ?? null, courses: configuredCourses.map((course) => ({ ...course, assessment: assessments.find((assessment) => assessment.classCourseId === course.classCourseId) ?? null })) };
+      return { candidate, finalDecision: finalDecision ?? null, secondSessionResult, courses: configuredCourses.map((course) => ({ ...course, maximum: course.periodWeight * 2, assessment: assessments.find((assessment) => assessment.classCourseId === course.classCourseId) ? { ...assessments.find((assessment) => assessment.classCourseId === course.classCourseId)!, maximum: course.periodWeight * 2 } : null })) };
     }),
   }),
   deliberation: router({
@@ -105,11 +115,10 @@ export const secondSessionRouter = router({
       const [session] = await db.select().from(deliberationSessions).where(eq(deliberationSessions.id, input.sessionId)).limit(1);
       if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session de délibération introuvable." });
       const activeEnrollments = await db.select({ id: enrollments.id }).from(enrollments).innerJoin(classes, eq(enrollments.classId, classes.id)).where(and(eq(classes.academicYearId, session.academicYearId), eq(enrollments.status, "active")));
+      const annualResults = await getAcademicResultsForYear(db, session.academicYearId, { type: "annual" });
+      const resultByEnrollment = new Map(annualResults.map((result) => [result.enrollmentId, result]));
       for (const enrollment of activeEnrollments) {
-        const rows = await db.select({ score: grades.score, maximum: grades.maximum }).from(grades).where(and(eq(grades.enrollmentId, enrollment.id), eq(grades.status, "validated")));
-        const score = rows.reduce((sum, item) => sum + item.score, 0);
-        const maximum = rows.reduce((sum, item) => sum + item.maximum, 0);
-        const average = maximum ? Math.round((score / maximum) * 100) : null;
+        const average = resultByEnrollment.get(enrollment.id)?.percentage ?? null;
         await db.insert(deliberationDecisions).values({ deliberationSessionId: session.id, enrollmentId: enrollment.id, finalAverage: average, proposedByUserId: ctx.user.id }).onDuplicateKeyUpdate({ set: { finalAverage: average } });
       }
       await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "deliberation_decisions_initialized", module: "deliberation", resourceType: "session", resourceId: session.id, afterState: JSON.stringify({ enrollments: activeEnrollments.length }) });

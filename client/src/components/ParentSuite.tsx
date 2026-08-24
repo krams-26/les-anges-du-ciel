@@ -34,16 +34,11 @@ export function ParentSuite({ view, onNavigate, parentName }: { view: ParentView
   const preferenceUpdate = trpc.parent.preferences.update.useMutation({ onSuccess: () => { preferencesQuery.refetch(); toast.success("Préférences enregistrées"); } });
   const markRead = trpc.parent.notifications.markRead.useMutation({ onSuccess: () => notificationsQuery.refetch() });
   const attendanceSummary = useMemo(() => (attendanceQuery.data ?? []).reduce((summary, item) => ({ ...summary, [item.status]: (summary[item.status] ?? 0) + 1 }), {} as Record<string, number>), [attendanceQuery.data]);
-  const totalScore = (resultsQuery.data ?? []).reduce((sum, item) => sum + item.score, 0);
-  const totalMaximum = (resultsQuery.data ?? []).reduce((sum, item) => sum + item.maximum, 0);
-  const percentage = totalMaximum ? Math.round((totalScore / totalMaximum) * 10000) / 100 : null;
-  const progression = useMemo(() => Object.values((progressionQuery.data ?? []).reduce((periods, item) => {
-    const current = periods[item.periodId] ?? { id: item.periodId, label: item.periodLabel, score: 0, maximum: 0 };
-    current.score += item.score;
-    current.maximum += item.maximum;
-    periods[item.periodId] = current;
-    return periods;
-  }, {} as Record<number, { id: number; label: string; score: number; maximum: number }>)).map((period) => ({ ...period, percentage: period.maximum ? Math.round((period.score / period.maximum) * 100) : 0 })).sort((a, b) => a.id - b.id), [progressionQuery.data]);
+  const academicResult = resultsQuery.data?.result;
+  const totalScore = academicResult?.obtained ?? 0;
+  const totalMaximum = academicResult?.comparableMaximum ?? 0;
+  const percentage = academicResult?.percentage ?? null;
+  const progression = useMemo(() => (progressionQuery.data?.progression ?? []).map((period) => ({ id: period.id, label: period.label, percentage: period.result.percentage ?? 0 })).sort((a, b) => a.id - b.id), [progressionQuery.data]);
 
   const header = (title: string, detail: string, back = false) => <header className="parent-page-header">{back && <button className="parent-back" onClick={() => onNavigate("dashboard")} aria-label="Retour"><ChevronLeft size={18} /></button>}<div><p className="eyebrow">Espace parent · Année scolaire 2026-2027</p><h1>{title}</h1><p>{detail}</p></div></header>;
   const childSwitcher = <div className="parent-child-switcher" aria-label="Changer d’enfant">{children.map((child) => <button key={child.enrollmentId} className={child.enrollmentId === selected?.enrollmentId ? "is-active" : ""} onClick={() => setSelectedEnrollmentId(child.enrollmentId)}><span>{child.firstName.slice(0, 1)}{child.lastName.slice(0, 1)}</span><strong>{fullName(child)}</strong><small>{child.className ?? "Classe non attribuée"}</small></button>)}</div>;
@@ -71,7 +66,12 @@ export function ParentSuite({ view, onNavigate, parentName }: { view: ParentView
       {view === "results" && <>
         {header("Résultats scolaires", selected ? `${fullName(selected)} · ${selected.className ?? "Classe"} · P1` : "")}
         {childSwitcher}
-        <State loading={resultsQuery.isLoading || progressionQuery.isLoading} error={resultsQuery.isError || progressionQuery.isError} empty={!resultsQuery.data?.length}><div className="parent-result-summary"><span>Points obtenus<strong>{totalScore} / {totalMaximum}</strong></span><span>Pourcentage<strong>{percentage} %</strong></span><span>Document<strong>Relevé de côtes</strong></span></div><div className="parent-progression"><div><p className="eyebrow">Suivi annuel</p><h2>Progression des résultats validés</h2><p>La moyenne de chaque période apparaît dès que les notes ont été validées par l’établissement.</p></div><div className="parent-progression-bars">{progression.map((period) => <div key={period.id} className="parent-progression-item"><div className="parent-progression-track"><i style={{ height: `${Math.max(period.percentage, 5)}%` }} /></div><strong>{period.percentage} %</strong><span>{period.label}</span></div>)}</div></div><div className="parent-table-wrap"><table><thead><tr><th>Cours</th><th>Points</th><th>Maximum</th><th>Pourcentage</th></tr></thead><tbody>{resultsQuery.data?.map((item) => <tr key={`${item.courseCode}-${item.periodId}`}><td>{item.courseName}</td><td>{item.score}</td><td>{item.maximum}</td><td>{Math.round((item.score / item.maximum) * 100)} %</td></tr>)}</tbody></table></div><p className="parent-note">Ce relevé de côtes est généré par l’école. Il ne constitue pas un bulletin officiel de l’État.</p></State>
+        <State loading={resultsQuery.isLoading || progressionQuery.isLoading} error={resultsQuery.isError || progressionQuery.isError} empty={!academicResult?.courses.length}>
+          <div className="parent-result-summary"><span>Points obtenus<strong>{totalScore} / {totalMaximum}</strong></span><span>Pourcentage<strong>{percentage ?? "—"}{percentage === null ? "" : " %"}</strong></span><span>Document<strong>Relevé de côtes</strong></span></div>
+          <div className="parent-progression"><div><p className="eyebrow">Suivi annuel</p><h2>Progression des résultats validés</h2><p>La moyenne de chaque période apparaît dès que les notes ont été validées par l’établissement.</p></div><div className="parent-progression-bars">{progression.map((period) => <div key={period.id} className="parent-progression-item"><div className="parent-progression-track"><i style={{ height: `${Math.max(period.percentage, 5)}%` }} /></div><strong>{period.percentage} %</strong><span>{period.label}</span></div>)}</div></div>
+          <div className="parent-table-wrap"><table><thead><tr><th>Cours</th><th>Points</th><th>Maximum</th><th>Pourcentage</th></tr></thead><tbody>{academicResult?.courses.map((item) => <tr key={item.classCourseId}><td>{item.courseName}</td><td>{item.obtained}</td><td>{item.comparableMaximum}</td><td>{item.percentage ?? "—"}{item.percentage === null ? "" : " %"}</td></tr>)}</tbody></table></div>
+          <p className="parent-note">Ce relevé de côtes est généré par l’école. Il ne constitue pas un bulletin officiel de l’État.</p>
+        </State>
       </>}
 
       {view === "attendance" && <>

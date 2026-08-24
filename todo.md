@@ -147,3 +147,12 @@
 ## Suivi — Publication GitHub
 
 - [x] Vérifier le dépôt, créer un commit documenté et pousser l’état de travail actuel vers GitHub.
+
+## Suivi — Moteur académique central
+
+- [x] Auditer les modèles, services et routeurs académiques existants sans modifier le design.
+- [x] Définir une source de vérité unique pour les pondérations de cours, périodes, semestres et année scolaire.
+- [x] Implémenter un service de calcul réutilisable pour périodes, semestres, annuel et classement comparable.
+- [x] Raccorder les résultats, relevés, deuxième session et délibération au moteur central sans dupliquer les formules.
+- [x] Couvrir les pondérations, notes absentes, corrections, classement et deuxième session par des tests.
+- [ ] Valider TypeScript, tests, intégration de base de données et build, puis synchroniser GitHub.
