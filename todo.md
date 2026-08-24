@@ -142,4 +142,4 @@
 
 ## Suivi — Publication GitHub
 
-- [ ] Vérifier le dépôt, créer un commit documenté et pousser l’état de travail actuel vers GitHub.
+- [x] Vérifier le dépôt, créer un commit documenté et pousser l’état de travail actuel vers GitHub.
