@@ -187,4 +187,4 @@
 - [x] Raccorder explicitement la préparation annuelle existante au flux d’admission annuelle validée, sans modifier le design.
 - [x] Vérifier e2e une sortie réelle, son audit, l’absence d’inscription suivante et l’enchaînement préparation–admission du même dossier permanent.
 - [x] Vérifier e2e la préparation réelle de la structure cible avant la réinscription explicite du même dossier permanent.
-- [ ] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
+- [x] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
