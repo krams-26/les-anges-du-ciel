@@ -155,4 +155,4 @@
 - [x] Implémenter un service de calcul réutilisable pour périodes, semestres, annuel et classement comparable.
 - [x] Raccorder les résultats, relevés, deuxième session et délibération au moteur central sans dupliquer les formules.
 - [x] Couvrir les pondérations, notes absentes, corrections, classement et deuxième session par des tests.
-- [ ] Valider TypeScript, tests, intégration de base de données et build, puis synchroniser GitHub.
+- [x] Valider TypeScript, tests, intégration de base de données et build, puis synchroniser GitHub.
