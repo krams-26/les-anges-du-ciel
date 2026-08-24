@@ -16,7 +16,9 @@ import {
   teachingAssignments,
   users,
 } from "../../drizzle/schema";
+import { desc } from "drizzle-orm";
 import { getDb } from "../db";
+import { createsNextEnrollment, requiresTargetClass, sourceEnrollmentStatus, targetEnrollmentType, type EnrollmentTransition } from "../enrollmentTransitions";
 import { institutionalPeriodDefinitions } from "../academicEngine";
 import { assertPermission } from "../permissions";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
@@ -184,6 +186,39 @@ export const schoolRouter = router({
       if (existing.length) throw new TRPCError({ code: "CONFLICT", message: "Cet élève possède déjà une inscription dans cette année scolaire." });
       await db.insert(enrollments).values({ ...input, classId: input.classId ?? null, status: "active" });
       return { ok: true };
+    }),
+    history: adminProcedure.input(z.object({ studentId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "enrollments", "view");
+      const db = await database();
+      return db.select({ enrollmentId: enrollments.id, academicYearId: academicYears.id, academicYear: academicYears.label, yearStatus: academicYears.status, className: classes.name, section: classes.section, level: classes.level, enrollmentType: enrollments.enrollmentType, status: enrollments.status, enrolledAt: enrollments.enrolledAt }).from(enrollments).innerJoin(academicYears, eq(enrollments.academicYearId, academicYears.id)).leftJoin(classes, eq(enrollments.classId, classes.id)).where(eq(enrollments.studentId, input.studentId)).orderBy(desc(academicYears.startsAt));
+    }),
+    transition: adminProcedure.input(z.object({ sourceEnrollmentId: z.number().int().positive(), transition: z.enum(["promote", "repeat", "transfer", "withdraw", "deceased", "exclude", "other"]), targetAcademicYearId: z.number().int().positive().optional(), targetClassId: z.number().int().positive().optional(), reason: z.string().trim().min(3).max(1500) })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "enrollments", "create");
+      const db = await database();
+      const [source] = await db.select({ id: enrollments.id, studentId: enrollments.studentId, academicYearId: enrollments.academicYearId, status: enrollments.status, sourceYearStatus: academicYears.status }).from(enrollments).innerJoin(academicYears, eq(enrollments.academicYearId, academicYears.id)).where(eq(enrollments.id, input.sourceEnrollmentId)).limit(1);
+      if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Inscription source introuvable." });
+      if (source.status !== "active" || source.sourceYearStatus !== "archived") throw new TRPCError({ code: "BAD_REQUEST", message: "Seule une inscription active d’une année archivée peut être finalisée." });
+      const transition = input.transition as EnrollmentTransition;
+      if (requiresTargetClass(transition) && (!input.targetAcademicYearId || !input.targetClassId)) throw new TRPCError({ code: "BAD_REQUEST", message: "La promotion ou le redoublement requiert une année et une classe cible." });
+      if (!createsNextEnrollment(transition)) {
+        await db.update(enrollments).set({ status: sourceEnrollmentStatus(transition) }).where(eq(enrollments.id, source.id));
+        await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "annual_enrollment_exit_recorded", module: "school", resourceType: "enrollment", resourceId: source.id, beforeState: JSON.stringify({ status: source.status }), afterState: JSON.stringify({ status: sourceEnrollmentStatus(transition), transition }), reason: input.reason });
+        return { sourceEnrollmentId: source.id, targetEnrollmentId: null };
+      }
+      if (input.targetAcademicYearId === source.academicYearId) throw new TRPCError({ code: "BAD_REQUEST", message: "La nouvelle inscription doit appartenir à une année scolaire distincte." });
+      const [targetYear] = await db.select({ status: academicYears.status }).from(academicYears).where(eq(academicYears.id, input.targetAcademicYearId!)).limit(1);
+      const [targetClass] = await db.select({ id: classes.id, academicYearId: classes.academicYearId }).from(classes).where(eq(classes.id, input.targetClassId!)).limit(1);
+      if (!targetYear || !targetClass || targetClass.academicYearId !== input.targetAcademicYearId || !["draft", "active"].includes(targetYear.status)) throw new TRPCError({ code: "BAD_REQUEST", message: "La classe cible doit appartenir à une année cible brouillon ou active." });
+      const [existing] = await db.select({ id: enrollments.id }).from(enrollments).where(and(eq(enrollments.studentId, source.studentId), eq(enrollments.academicYearId, input.targetAcademicYearId!))).limit(1);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "Le dossier permanent possède déjà une inscription dans l’année cible." });
+      await db.transaction(async (tx) => {
+        await tx.update(enrollments).set({ status: "closed" }).where(eq(enrollments.id, source.id));
+        await tx.insert(enrollments).values({ studentId: source.studentId, academicYearId: input.targetAcademicYearId!, classId: input.targetClassId!, enrollmentType: targetEnrollmentType(transition), status: "active" });
+      });
+      const [target] = await db.select({ id: enrollments.id }).from(enrollments).where(and(eq(enrollments.studentId, source.studentId), eq(enrollments.academicYearId, input.targetAcademicYearId!))).limit(1);
+      if (!target) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "La nouvelle inscription annuelle n’a pas été créée." });
+      await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "annual_enrollment_transitioned", module: "school", resourceType: "enrollment", resourceId: target.id, beforeState: JSON.stringify({ sourceEnrollmentId: source.id, status: source.status }), afterState: JSON.stringify({ targetEnrollmentId: target.id, studentId: source.studentId, transition, enrollmentType: targetEnrollmentType(transition) }), reason: input.reason });
+      return { sourceEnrollmentId: source.id, targetEnrollmentId: target.id };
     }),
   }),
   classes: router({

@@ -31,6 +31,7 @@ const sensitiveRouters: Record<string, PermissionExpectation[]> = {
     { procedure: "prepare", resource: "settings", action: "edit" },
     { procedure: "bulkCreate", resource: "students", action: "create" },
     { procedure: "createForStudent", resource: "enrollments", action: "create" },
+    { procedure: "transition", resource: "enrollments", action: "create" },
     { procedure: "configure", resource: "settings", action: "edit" },
     { procedure: "updateWeight", resource: "settings", action: "edit" },
     { procedure: "linkAccount", resource: "users", action: "edit" },

@@ -176,3 +176,15 @@
 - [x] Vérifier e2e le refus puis l’autorisation de proclamation autour d’une délibération individuelle requise.
 - [x] Vérifier e2e les audits produits par les statuts absent et terminé de deuxième session.
 - [x] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
+
+## Suivi — Clôture et archivage annuels
+
+- [x] Auditer les inscriptions historiques, la préparation annuelle et les garde-fous anti-doublons existants.
+- [x] Définir les transitions explicites de promotion, redoublement et sortie sans recréer l’identité élève.
+- [x] Ajouter les validations et audits de réinscription annuelle, de conservation historique et de statuts configurés.
+- [x] Raccorder la préparation annuelle existante aux admissions explicites sans modifier l’interface.
+- [x] Couvrir la continuité des dossiers, les doublons, les sorties et l’accès historique par des tests.
+- [x] Raccorder explicitement la préparation annuelle existante au flux d’admission annuelle validée, sans modifier le design.
+- [x] Vérifier e2e une sortie réelle, son audit, l’absence d’inscription suivante et l’enchaînement préparation–admission du même dossier permanent.
+- [x] Vérifier e2e la préparation réelle de la structure cible avant la réinscription explicite du même dossier permanent.
+- [ ] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
