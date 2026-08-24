@@ -1,10 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { academicPeriods, attendanceRecords, attendanceSessions, classCourses, classes, courses, enrollments, grades, students, teacherReports, teachers, teachingAssignments } from "../../drizzle/schema";
+import { academicPeriods, attendanceRecords, attendanceSessions, auditEvents, classCourses, classes, courses, enrollments, grades, students, teacherReports, teachers, teachingAssignments } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { getGradeWriteContext } from "../academicResults";
-import { getAcademicResultsForYear } from "../academicResults";
+import { getAcademicResultsForYear, getGradeWriteContext, getTeachingAssignmentContext } from "../academicResults";
 import { maximumForConfiguredCoursePeriod, rankAcademicResults } from "../academicEngine";
 import { assertPermission } from "../permissions";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -22,8 +21,8 @@ export function canAccessAssignment(userRole: "user" | "admin" | "parent", linke
 async function assertAssignmentAccess(userId: number, userRole: "user" | "admin" | "parent", assignmentId: number) {
   if (userRole === "admin") return;
   const db = await dbOrThrow();
-  const matches = await db.select({ id: teachingAssignments.id, linkedUserId: teachers.userId }).from(teachingAssignments).innerJoin(teachers, eq(teachingAssignments.teacherId, teachers.id)).where(eq(teachingAssignments.id, assignmentId)).limit(1);
-  if (!matches.length || !canAccessAssignment(userRole, matches[0].linkedUserId, userId)) throw new TRPCError({ code: "FORBIDDEN", message: "Cette affectation ne vous autorise pas à effectuer cette opération." });
+  const matches = await db.select({ id: teachingAssignments.id, linkedUserId: teachers.userId, status: teachingAssignments.status }).from(teachingAssignments).innerJoin(teachers, eq(teachingAssignments.teacherId, teachers.id)).where(eq(teachingAssignments.id, assignmentId)).limit(1);
+  if (!matches.length || matches[0].status !== "active" || !canAccessAssignment(userRole, matches[0].linkedUserId, userId)) throw new TRPCError({ code: "FORBIDDEN", message: "Cette affectation active ne vous autorise pas à effectuer cette opération." });
 }
 
 export const teachingInputs = {
@@ -45,7 +44,7 @@ export const teachingRouter = router({
     await assertAssignmentAccess(ctx.user.id, ctx.user.role, input.assignmentId);
     await assertPermission(ctx.user.id, "students", "view");
     const db = await dbOrThrow();
-    return db.select({ enrollmentId: enrollments.id, studentId: students.id, studentCode: students.studentCode, lastName: students.lastName, firstName: students.firstName, sex: students.sex }).from(teachingAssignments).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(enrollments, eq(classCourses.classId, enrollments.classId)).innerJoin(students, eq(enrollments.studentId, students.id)).where(and(eq(teachingAssignments.id, input.assignmentId), eq(enrollments.status, "active")));
+    return db.select({ enrollmentId: enrollments.id, studentId: students.id, studentCode: students.studentCode, lastName: students.lastName, firstName: students.firstName, sex: students.sex }).from(teachingAssignments).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).innerJoin(enrollments, eq(classCourses.classId, enrollments.classId)).innerJoin(students, eq(enrollments.studentId, students.id)).where(and(eq(teachingAssignments.id, input.assignmentId), eq(enrollments.academicYearId, classes.academicYearId), eq(enrollments.status, "active")));
   }),
   periods: protectedProcedure.input(z.object({ assignmentId: z.number().int().positive() })).query(async ({ ctx, input }) => {
     await assertAssignmentAccess(ctx.user.id, ctx.user.role, input.assignmentId);
@@ -67,12 +66,15 @@ export const teachingRouter = router({
   attendance: router({
     save: protectedProcedure.input(teachingInputs.attendance).mutation(async ({ ctx, input }) => {
       await assertAssignmentAccess(ctx.user.id, ctx.user.role, input.assignmentId); await assertPermission(ctx.user.id, "attendance", "create"); const db = await dbOrThrow();
+      const context = await getTeachingAssignmentContext(db, input.assignmentId, input.records.map((record) => record.enrollmentId));
+      if (!context) throw new TRPCError({ code: "FORBIDDEN", message: "Un ou plusieurs élèves ne relèvent pas de la classe et de l’année de cette affectation." });
       await db.insert(attendanceSessions).values({ teachingAssignmentId: input.assignmentId, sessionDate: input.sessionDate, status: "submitted", submittedByUserId: ctx.user.id, submittedAt: new Date() }).onDuplicateKeyUpdate({ set: { status: "submitted", submittedByUserId: ctx.user.id, submittedAt: new Date() } });
       const [session] = await db.select({ id: attendanceSessions.id }).from(attendanceSessions).where(and(eq(attendanceSessions.teachingAssignmentId, input.assignmentId), eq(attendanceSessions.sessionDate, input.sessionDate))).limit(1);
       if (!session) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "La séance de présence n’a pas été créée." });
       for (const record of input.records) {
         await db.insert(attendanceRecords).values({ attendanceSessionId: session.id, enrollmentId: record.enrollmentId, status: record.status, note: record.note || null }).onDuplicateKeyUpdate({ set: { status: record.status, note: record.note || null } });
       }
+      await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "teacher_attendance_saved", module: "teaching", resourceType: "assignment", resourceId: input.assignmentId, afterState: JSON.stringify({ sessionDate: input.sessionDate, enrollmentIds: input.records.map((record) => record.enrollmentId) }) });
       return { saved: input.records.length };
     }),
   }),
@@ -85,6 +87,7 @@ export const teachingRouter = router({
       for (const score of input.scores) {
         await db.insert(grades).values({ teachingAssignmentId: input.assignmentId, academicPeriodId: input.periodId, enrollmentId: score.enrollmentId, score: score.score, maximum: context.maximum, status: "draft", enteredByUserId: ctx.user.id }).onDuplicateKeyUpdate({ set: { score: score.score, maximum: context.maximum, status: "draft", enteredByUserId: ctx.user.id } });
       }
+      await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "teacher_grades_drafted", module: "teaching", resourceType: "assignment", resourceId: input.assignmentId, afterState: JSON.stringify({ periodId: input.periodId, enrollmentIds: input.scores.map((score) => score.enrollmentId), maximum: context.maximum }) });
       return { saved: input.scores.length, status: "draft" as const };
     }),
     submit: protectedProcedure.input(teachingInputs.grades).mutation(async ({ ctx, input }) => {
@@ -95,13 +98,17 @@ export const teachingRouter = router({
       for (const score of input.scores) {
         await db.insert(grades).values({ teachingAssignmentId: input.assignmentId, academicPeriodId: input.periodId, enrollmentId: score.enrollmentId, score: score.score, maximum: context.maximum, status: "submitted", enteredByUserId: ctx.user.id, submittedAt: new Date() }).onDuplicateKeyUpdate({ set: { score: score.score, maximum: context.maximum, status: "submitted", enteredByUserId: ctx.user.id, submittedAt: new Date() } });
       }
+      await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: "teacher_grades_submitted", module: "teaching", resourceType: "assignment", resourceId: input.assignmentId, afterState: JSON.stringify({ periodId: input.periodId, enrollmentIds: input.scores.map((score) => score.enrollmentId), maximum: context.maximum }) });
       return { submitted: input.scores.length, status: "submitted" as const };
     }),
   }),
   reports: router({
     save: protectedProcedure.input(z.object({ assignmentId: z.number().int().positive(), periodId: z.number().int().positive(), courseDelivery: z.string().max(10000).optional(), plannedProgram: z.string().max(10000).optional(), completedProgram: z.string().max(10000).optional(), progressPercentage: z.number().int().min(0).max(100).optional(), difficulties: z.string().max(10000).optional(), classParticipation: z.enum(["TB", "B", "M", "INSUFFICIENT"]).optional(), generalNotes: z.string().max(10000).optional(), additionalComments: z.string().max(10000).optional(), submit: z.boolean().default(false) })).mutation(async ({ ctx, input }) => {
       await assertAssignmentAccess(ctx.user.id, ctx.user.role, input.assignmentId); await assertPermission(ctx.user.id, "grades", "edit"); const db = await dbOrThrow(); const { assignmentId, periodId, submit, ...values } = input;
+      const context = await getGradeWriteContext(db, assignmentId, periodId, []);
+      if (!context) throw new TRPCError({ code: "BAD_REQUEST", message: "La période ne correspond pas à l’année scolaire de cette affectation." });
       await db.insert(teacherReports).values({ teachingAssignmentId: assignmentId, academicPeriodId: periodId, ...values, status: submit ? "submitted" : "draft", submittedAt: submit ? new Date() : null }).onDuplicateKeyUpdate({ set: { ...values, status: submit ? "submitted" : "draft", submittedAt: submit ? new Date() : null } });
+      await db.insert(auditEvents).values({ actorUserId: ctx.user.id, action: submit ? "teacher_report_submitted" : "teacher_report_drafted", module: "teaching", resourceType: "assignment", resourceId: assignmentId, afterState: JSON.stringify({ periodId, status: submit ? "submitted" : "draft" }) });
       return { status: submit ? "submitted" as const : "draft" as const };
     }),
   }),

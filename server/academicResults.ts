@@ -5,6 +5,14 @@ import { calculateAcademicResult, maximumForConfiguredCoursePeriod, type Academi
 
 type Database = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
+export function enrollmentMatchesTeachingContext(assignment: { classId: number; academicYearId: number }, enrollment: { classId: number | null; academicYearId: number; status: string }) {
+  return enrollment.status === "active" && enrollment.classId === assignment.classId && enrollment.academicYearId === assignment.academicYearId;
+}
+
+export function periodMatchesTeachingContext(assignment: { academicYearId: number }, period: { academicYearId: number }) {
+  return period.academicYearId === assignment.academicYearId;
+}
+
 function toPeriods(rows: { id: number; code: string; kind: "period" | "exam" | "semester" | "annual"; sequence: number }[]): AcademicPeriod[] {
   return rows.map((row) => ({ id: row.id, code: row.code, kind: row.kind, sequence: row.sequence }));
 }
@@ -18,18 +26,25 @@ function toCourseConfigurations(rows: { id: number; classId: number; courseId: n
   return byClass;
 }
 
-/** Vérifie qu’une note se rattache à la classe et à l’année de l’inscription concernée. */
-export async function getGradeWriteContext(db: Database, assignmentId: number, periodId: number, enrollmentIds: number[]) {
+/** Vérifie l’affectation active et, le cas échéant, l’appartenance des élèves à sa classe et à son année. */
+export async function getTeachingAssignmentContext(db: Database, assignmentId: number, enrollmentIds: number[] = []) {
   const [assignment] = await db.select({ classId: classes.id, academicYearId: classes.academicYearId, periodWeight: classCourses.periodWeight, classCourseId: classCourses.id }).from(teachingAssignments).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).where(eq(teachingAssignments.id, assignmentId)).limit(1);
   if (!assignment) return null;
+  if (enrollmentIds.length) {
+    const allowed = await db.select({ id: enrollments.id, classId: enrollments.classId, academicYearId: enrollments.academicYearId, status: enrollments.status }).from(enrollments).where(inArray(enrollments.id, enrollmentIds));
+    if (allowed.length !== Array.from(new Set(enrollmentIds)).length || !allowed.every((enrollment) => enrollmentMatchesTeachingContext(assignment, enrollment))) return null;
+  }
+  return assignment;
+}
+
+/** Vérifie qu’une note se rattache à la classe, au cours et à l’année de l’affectation. */
+export async function getGradeWriteContext(db: Database, assignmentId: number, periodId: number, enrollmentIds: number[]) {
+  const assignment = await getTeachingAssignmentContext(db, assignmentId, enrollmentIds);
+  if (!assignment) return null;
   const [period] = await db.select({ id: academicPeriods.id, academicYearId: academicPeriods.academicYearId, code: academicPeriods.code, kind: academicPeriods.kind, sequence: academicPeriods.sequence }).from(academicPeriods).where(eq(academicPeriods.id, periodId)).limit(1);
-  if (!period || period.academicYearId !== assignment.academicYearId) return null;
+  if (!period || !periodMatchesTeachingContext(assignment, period)) return null;
   const maximum = maximumForConfiguredCoursePeriod(assignment.periodWeight, period);
   if (!maximum) return null;
-  if (enrollmentIds.length) {
-    const allowed = await db.select({ id: enrollments.id }).from(enrollments).where(and(inArray(enrollments.id, enrollmentIds), eq(enrollments.classId, assignment.classId), eq(enrollments.academicYearId, assignment.academicYearId), eq(enrollments.status, "active")));
-    if (allowed.length !== Array.from(new Set(enrollmentIds)).length) return null;
-  }
   return { ...assignment, period, maximum };
 }
 
