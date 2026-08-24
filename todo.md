@@ -227,4 +227,4 @@
 - [x] Remplacer les sélecteurs historiques codés en dur de l’assistant complet d’inscription par les années et classes persistantes.
 - [x] Ajouter ou adapter les tests de procédures et vérifier les parcours administratifs dans le navigateur.
 - [x] Valider TypeScript, tests et build.
-- [ ] Synchroniser la correction validée sur GitHub après le checkpoint.
+- [x] Synchroniser la correction validée sur GitHub après le checkpoint.
