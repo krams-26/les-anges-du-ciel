@@ -87,6 +87,8 @@
 - [x] Mettre à niveau le projet avec comptes utilisateurs et base de données de test.
 - [x] Créer les tables et les procédures des dossiers scolaires, classes, cours, enseignants et affectations.
 - [ ] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
+- [ ] Raccorder la préparation annuelle des classes aux mutations persistantes plutôt qu’à un simple accusé de réception.
+- [ ] Raccorder les actions de suivi de classe aux modules existants plutôt qu’à des messages informatifs.
 - [x] Raccorder les affectations et pondérations administratives au registre persistant, sans données de démonstration.
 - [x] Ajouter le lien sécurisé entre une fiche enseignant et un compte utilisateur pour activer son espace pédagogique.
 - [x] Exécuter les parcours d’écriture de bout en bout avec un compte administrateur de test.
@@ -137,3 +139,7 @@
 - [x] Ajouter des tests Vitest d’autorisation et de refus pour rôle hérité et dérogation utilisateur.
 - [x] Construire le centre de contrôle annuel à partir des états pédagogiques, financiers et de délibération réels.
 - [ ] Vérifier les nouveaux contrôles de permissions et le centre annuel en desktop et mobile.
+
+## Suivi — Publication GitHub
+
+- [ ] Vérifier le dépôt, créer un commit documenté et pousser l’état de travail actuel vers GitHub.
