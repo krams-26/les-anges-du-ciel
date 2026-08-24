@@ -64,6 +64,7 @@ export const schoolInputs = {
   teacherCreate: z.object({ employeeCode: z.string().trim().toUpperCase().min(3).max(32), fullName: z.string().trim().min(3).max(180), phone: z.string().trim().max(40).optional(), email: z.string().trim().email().optional(), specialties: z.string().trim().max(500).optional() }),
   classCourseCreate: z.object({ classId: z.number().int().positive(), courseId: z.number().int().positive(), periodWeight: z.number().int().min(1).max(100) }),
   assignmentCreate: z.object({ teacherId: z.number().int().positive(), classCourseId: z.number().int().positive() }),
+  annualPrepare: z.object({ sourceAcademicYearId: z.number().int().positive(), targetAcademicYearId: z.number().int().positive(), copyCourses: z.boolean(), copyWeights: z.boolean(), copySuggestions: z.boolean() }),
 };
 
 async function database() {
@@ -80,7 +81,38 @@ export const schoolRouter = router({
       if (input.endsAt <= input.startsAt) throw new TRPCError({ code: "BAD_REQUEST", message: "La fin de l’année doit être postérieure à son début." });
       const db = await database();
       await db.insert(academicYears).values({ ...input, status: "draft" });
-      return { ok: true };
+      const [created] = await db.select({ id: academicYears.id }).from(academicYears).where(eq(academicYears.code, input.code)).limit(1);
+      return { ok: true, id: created?.id };
+    }),
+    prepare: adminProcedure.input(schoolInputs.annualPrepare).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "settings", "edit");
+      if (input.sourceAcademicYearId === input.targetAcademicYearId) throw new TRPCError({ code: "BAD_REQUEST", message: "Choisissez une année cible distincte." });
+      const db = await database();
+      const sourceClasses = await db.select().from(classes).where(eq(classes.academicYearId, input.sourceAcademicYearId));
+      if (!sourceClasses.length) throw new TRPCError({ code: "NOT_FOUND", message: "Aucune classe source à préparer." });
+      const targetClasses = await db.select({ id: classes.id }).from(classes).where(eq(classes.academicYearId, input.targetAcademicYearId)).limit(1);
+      if (targetClasses.length) throw new TRPCError({ code: "CONFLICT", message: "L’année cible contient déjà des classes ; sa préparation doit rester explicite." });
+      let configuredCourses = 0;
+      let suggestedAssignments = 0;
+      await db.transaction(async (tx) => {
+        await tx.insert(classes).values(sourceClasses.map((sourceClass) => ({ academicYearId: input.targetAcademicYearId, section: sourceClass.section, level: sourceClass.level, name: sourceClass.name, status: "draft" as const })));
+        if (!input.copyCourses) return;
+        const targetRows = await tx.select({ id: classes.id, name: classes.name }).from(classes).where(eq(classes.academicYearId, input.targetAcademicYearId));
+        const targetByName = new Map(targetRows.map((row) => [row.name, row.id]));
+        const sourceById = new Map(sourceClasses.map((row) => [row.id, row]));
+        const configurations = await tx.select({ id: classCourses.id, classId: classCourses.classId, courseId: classCourses.courseId, periodWeight: classCourses.periodWeight }).from(classCourses).where(inArray(classCourses.classId, sourceClasses.map((row) => row.id)));
+        const copiedConfigurations = configurations.flatMap((configuration) => { const sourceClass = sourceById.get(configuration.classId); const targetClassId = sourceClass ? targetByName.get(sourceClass.name) : undefined; return targetClassId ? [{ classId: targetClassId, courseId: configuration.courseId, periodWeight: input.copyWeights ? configuration.periodWeight : 1, status: "configured" as const }] : []; });
+        if (copiedConfigurations.length) await tx.insert(classCourses).values(copiedConfigurations);
+        configuredCourses = copiedConfigurations.length;
+        if (!input.copySuggestions || !configurations.length) return;
+        const targetConfigurations = await tx.select({ id: classCourses.id, classId: classCourses.classId, courseId: classCourses.courseId }).from(classCourses).where(inArray(classCourses.classId, targetRows.map((row) => row.id)));
+        const targetConfigurationByKey = new Map(targetConfigurations.map((row) => [`${row.classId}:${row.courseId}`, row.id]));
+        const sourceAssignments = await tx.select({ teacherId: teachingAssignments.teacherId, classCourseId: teachingAssignments.classCourseId }).from(teachingAssignments).where(and(inArray(teachingAssignments.classCourseId, configurations.map((row) => row.id)), eq(teachingAssignments.status, "active")));
+        const suggestions = sourceAssignments.flatMap((assignment) => { const configuration = configurations.find((row) => row.id === assignment.classCourseId); const sourceClass = configuration ? sourceById.get(configuration.classId) : undefined; const targetClassId = sourceClass ? targetByName.get(sourceClass.name) : undefined; const targetConfigurationId = targetClassId && configuration ? targetConfigurationByKey.get(`${targetClassId}:${configuration.courseId}`) : undefined; return targetConfigurationId ? [{ teacherId: assignment.teacherId, classCourseId: targetConfigurationId, status: "inactive" as const }] : []; });
+        if (suggestions.length) await tx.insert(teachingAssignments).values(suggestions);
+        suggestedAssignments = suggestions.length;
+      });
+      return { copiedClasses: sourceClasses.length, configuredCourses, suggestedAssignments };
     }),
   }),
   students: router({

@@ -87,8 +87,12 @@
 - [x] Mettre à niveau le projet avec comptes utilisateurs et base de données de test.
 - [x] Créer les tables et les procédures des dossiers scolaires, classes, cours, enseignants et affectations.
 - [ ] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
-- [ ] Raccorder la préparation annuelle des classes aux mutations persistantes plutôt qu’à un simple accusé de réception.
+- [x] Raccorder la préparation annuelle des classes aux mutations persistantes plutôt qu’à un simple accusé de réception.
 - [ ] Raccorder les actions de suivi de classe aux modules existants plutôt qu’à des messages informatifs.
+- [x] Raccorder depuis l’espace de classe la gestion des pondérations et des affectations aux modules administratifs persistants.
+- [x] Créer une mutation transactionnelle de copie annuelle des classes, cours configurés, pondérations et suggestions d’affectation.
+- [x] Vérifier e2e que la copie annuelle n’inscrit ni ne déplace automatiquement les élèves.
+- [x] Comparer les inscriptions et leurs classes avant/après la copie annuelle dans le test e2e.
 - [x] Raccorder les affectations et pondérations administratives au registre persistant, sans données de démonstration.
 - [x] Ajouter le lien sécurisé entre une fiche enseignant et un compte utilisateur pour activer son espace pédagogique.
 - [x] Exécuter les parcours d’écriture de bout en bout avec un compte administrateur de test.

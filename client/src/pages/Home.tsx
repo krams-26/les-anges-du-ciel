@@ -501,7 +501,7 @@ export default function Home() {
           {isStudentProfile && role === "admin" && <StudentProfile onBack={() => navigate("Élèves")} onToast={showToast} />}
           {isEnrollment && role === "admin" && <EnrollmentWizard onBack={() => navigate("Élèves")} onSuccess={showSuccessToast} />}
           {isClasses && role === "admin" && <ClassManagement onToast={showToast} onOpenWorkspace={() => navigate("Espace de classe")} onNavigate={navigate} />}
-          {isClassWorkspace && role === "admin" && <ClassWorkspace onBack={() => navigate("Classes")} onToast={showToast} />}
+          {isClassWorkspace && role === "admin" && <ClassWorkspace onBack={() => navigate("Classes")} onToast={showToast} onNavigate={navigate} />}
           {activeNav === "Cours" && role === "admin" && <CourseCatalog onToast={showToast} onNavigate={navigate} />}
           {activeNav === "Cours et pondérations" && role === "admin" && <WeightConfiguration onBack={() => navigate("Espace de classe")} onToast={showToast} />}
           {activeNav === "Enseignants" && role === "admin" && <><TeacherManagement onToast={showToast} onNavigate={navigate} /><TeacherAccountLinker onToast={showToast} /></>}
