@@ -86,9 +86,9 @@
 - [x] Relancer chaque script de vérification après correction et confirmer sa terminaison sans processus résiduel.
 - [x] Mettre à niveau le projet avec comptes utilisateurs et base de données de test.
 - [x] Créer les tables et les procédures des dossiers scolaires, classes, cours, enseignants et affectations.
-- [ ] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
+- [x] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
 - [x] Raccorder la préparation annuelle des classes aux mutations persistantes plutôt qu’à un simple accusé de réception.
-- [ ] Raccorder les actions de suivi de classe aux modules existants plutôt qu’à des messages informatifs.
+- [x] Raccorder les actions de suivi de classe aux modules existants plutôt qu’à des messages informatifs.
 - [x] Raccorder depuis l’espace de classe la gestion des pondérations et des affectations aux modules administratifs persistants.
 - [x] Créer une mutation transactionnelle de copie annuelle des classes, cours configurés, pondérations et suggestions d’affectation.
 - [x] Vérifier e2e que la copie annuelle n’inscrit ni ne déplace automatiquement les élèves.
@@ -133,8 +133,8 @@
 
 ## Suivi — Contrôle annuel et autorisations fines
 
-- [ ] Appliquer les dérogations de permissions et les rôles d’accès aux opérations sensibles côté serveur.
-- [ ] Établir et vérifier une couverture récapitulative des procédures sensibles protégées par permissions fines.
+- [x] Appliquer les dérogations de permissions et les rôles d’accès aux opérations sensibles côté serveur.
+- [x] Établir et vérifier une couverture récapitulative des procédures sensibles protégées par permissions fines.
 - [x] Étendre les permissions fines aux procédures transverses sensibles et les vérifier par route réelle.
 - [x] Étendre les permissions fines aux lectures parent et transverses soumises à autorisation.
 - [x] Tester une dérogation utilisateur sur une opération sensible de route réelle.

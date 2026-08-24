@@ -17,9 +17,21 @@ const courses = [{ course: "Mathématiques", teacher: "M. Patrick Kabila", perio
 const teachers = [{ name: "M. Patrick Kabila", course: "Mathématiques", coverage: "P1 · P2 · Examen", notes: "À jour" }, { name: "Mme Marie Nsimba", course: "Français", coverage: "P1 · P2 · Examen", notes: "À jour" }, { name: "M. Jean Kabasele", course: "Anglais", coverage: "P1 · P2 · Examen", notes: "À compléter" }, { name: "Mme Nicole Bemba", course: "Histoire", coverage: "P1 · P2 · Examen", notes: "À jour" }];
 const resultData = [{ name: "Math.", average: 15.8 }, { name: "Français", average: 14.6 }, { name: "Anglais", average: 13.9 }, { name: "Histoire", average: 15.1 }, { name: "Sciences", average: 14.3 }];
 
-export function ClassWorkspace({ onBack, onToast, onNavigate }: { onBack: () => void; onToast: (title: string, description: string) => void; onNavigate: (label: string) => void }) {
+export function ClassWorkspace({ onBack, onToast: onContextAction, onNavigate }: { onBack: () => void; onToast: (title: string, description: string) => void; onNavigate: (label: string) => void }) {
   const [activeTab, setActiveTab] = useState<ClassTab>(() => new URLSearchParams(window.location.search).get("onglet-classe") === "cours" ? "courses" : "students");
   const [search, setSearch] = useState("");
+  const onToast = (title: string, description: string) => {
+    const destinations: Record<string, string> = {
+      "Ajout d’élève": "Inscription / Réinscription",
+      "Gestion de classe": "Classes",
+      "Génération du relevé": "Relevés",
+      Planification: "Présences",
+      Rapport: "Résultats",
+    };
+    const destination = destinations[title];
+    if (destination) return onNavigate(destination);
+    onContextAction(title, description);
+  };
   const filteredRoster = roster.filter((student) => !search || `${student.name} ${student.code}`.toLowerCase().includes(search.toLowerCase()));
   const overview = <div className="class-workspace-overview"><div className="class-metric-strip"><div><span>34</span><small>élèves inscrits</small></div><div><span>12</span><small>cours configurés</small></div><div><span>8</span><small>enseignants affectés</small></div><div><span>96,2 %</span><small>présence actuelle</small></div><div><span>14,7 / 20</span><small>moyenne de classe</small></div></div></div>;
   const students = <section className="workspace-section"><div className="workspace-table-toolbar"><div><p className="eyebrow">Élèves · 7e A</p><h2>Registre des inscriptions</h2></div><div className="workspace-search"><Search size={15} /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un élève" /></div></div><div className="workspace-table-wrap"><table className="workspace-table"><thead><tr><th><Checkbox aria-label="Sélectionner les élèves" /></th><th>Photo</th><th>Matricule</th><th>Nom complet</th><th>Sexe</th><th>Statut</th><th>Moyenne</th><th>Rang</th><th>Solde</th></tr></thead><tbody>{filteredRoster.map((student) => <tr key={student.code}><td><Checkbox aria-label={`Sélectionner ${student.name}`} /></td><td><span className={`student-photo student-photo-${student.sex.toLowerCase()}`}>{student.initials}</span></td><td><strong className="student-code">{student.code}</strong></td><td><strong>{student.name}</strong></td><td>{student.sex}</td><td><Badge className={`status-badge ${student.status === "Actif" ? "success" : "warning"}`}>{student.status}</Badge></td><td><strong>{student.average}</strong></td><td>{student.rank}</td><td><strong className={student.balance === "À jour" ? "balance" : "balance balance-high"}>{student.balance}</strong></td></tr>)}</tbody></table></div></section>;
