@@ -175,4 +175,4 @@
 - [x] Tester le traitement des candidats absents ou terminés et la délibération individuelle exigée avant proclamation.
 - [x] Vérifier e2e le refus puis l’autorisation de proclamation autour d’une délibération individuelle requise.
 - [x] Vérifier e2e les audits produits par les statuts absent et terminé de deuxième session.
-- [ ] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
+- [x] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
