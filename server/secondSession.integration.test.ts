@@ -13,6 +13,7 @@ const context: TrpcContext = {
 integration.sequential("audit de deuxième session", () => {
   const caller = appRouter.createCaller(context);
   let decisionId = 0;
+  let deliberationSessionId = 0;
 
   afterAll(async () => {
     await closeDbPool();
@@ -27,6 +28,7 @@ integration.sequential("audit de deuxième session", () => {
     const setting = await caller.secondSession.settings.save({ id: existing?.id, academicYearId: year!.id, eligibilityMode: "below_average", thresholdPercent: 50, status: "open", registrationDeadline: null, examStartsAt: null, examEndsAt: null });
     await caller.secondSession.candidates.evaluate({ settingId: setting.id });
     const session = await caller.secondSession.deliberation.createSession({ academicYearId: year!.id, label: `Audit Vitest ${Date.now()}` });
+    deliberationSessionId = session.id;
     await caller.secondSession.deliberation.initialize({ sessionId: session.id });
     const decisions = await caller.secondSession.deliberation.decisions({ sessionId: session.id });
     const selected = decisions[0];
@@ -41,6 +43,8 @@ integration.sequential("audit de deuxième session", () => {
   it("journalise une rectification et replace la décision à l’état proposé", async () => {
     expect(decisionId).toBeGreaterThan(0);
     await caller.secondSession.deliberation.rectify({ decisionId, decision: "referred", basis: "manual", finalAverage: 45, rationale: "Rectification de test Vitest." });
+    const decisions = await caller.secondSession.deliberation.decisions({ sessionId: deliberationSessionId });
+    expect(decisions.find((decision) => decision.id === decisionId)?.status).toBe("proposed");
     const history = await caller.secondSession.deliberation.history({ decisionId });
     expect(history.some((event) => event.action === "rectified")).toBe(true);
   }, 30_000);

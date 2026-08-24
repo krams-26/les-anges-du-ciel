@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { academicYears, classes, deliberationDecisions, enrollments, grades, guardianUserLinks, guardians, studentDocuments, studentPayments, students, teacherReports, teachers, teachingAssignments, userNotifications, users } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { assertPermission } from "../permissions";
 import { protectedProcedure, router } from "../_core/trpc";
 
 async function database() {
@@ -50,6 +51,9 @@ export const personalRouter = router({
     const db = await database();
     const tasks: Array<{ id: string; title: string; detail: string; priority: "high" | "medium" | "low"; route: string }> = [];
     if (ctx.user.role === "admin") {
+      await assertPermission(ctx.user.id, "grades", "validate");
+      await assertPermission(ctx.user.id, "finance", "view");
+      await assertPermission(ctx.user.id, "results", "validate");
       const [submittedGrades] = await db.select({ value: count() }).from(grades).where(eq(grades.status, "submitted"));
       const [submittedReports] = await db.select({ value: count() }).from(teacherReports).where(eq(teacherReports.status, "submitted"));
       const [pendingPayments] = await db.select({ value: count() }).from(studentPayments).where(eq(studentPayments.status, "pending"));
@@ -77,6 +81,7 @@ export const personalRouter = router({
     const showFinance = input.category === "all" || input.category === "finance";
     const showDocuments = input.category === "all" || input.category === "documents";
     if (showStudents) {
+      await assertPermission(ctx.user.id, "students", "view");
       let allowedStudentIds: number[] | null = null;
       if (ctx.user.role === "parent") allowedStudentIds = await parentStudentIds(ctx.user.id);
       if (allowedStudentIds === null || allowedStudentIds.length) {
@@ -85,18 +90,22 @@ export const personalRouter = router({
       }
     }
     if (showStaff && ctx.user.role === "admin") {
+      await assertPermission(ctx.user.id, "users", "view");
       const rows = await db.select({ id: teachers.id, name: teachers.fullName, specialties: teachers.specialties }).from(teachers).where(like(teachers.fullName, term)).limit(8);
       result.push(...rows.map((row) => ({ id: row.id, category: "staff" as const, title: row.name, detail: row.specialties || "Enseignant", route: "enseignants" })));
     }
     if (showClasses && ctx.user.role !== "parent") {
+      await assertPermission(ctx.user.id, "students", "view");
       const rows = await db.select({ id: classes.id, name: classes.name, section: classes.section, level: classes.level }).from(classes).where(or(like(classes.name, term), like(classes.section, term), like(classes.level, term))).limit(8);
       result.push(...rows.map((row) => ({ id: row.id, category: "classes" as const, title: row.name, detail: `${row.section} · ${row.level}`, route: "classes" })));
     }
     if (showFinance && ctx.user.role === "admin") {
+      await assertPermission(ctx.user.id, "finance", "view");
       const rows = await db.select({ id: studentPayments.id, reference: studentPayments.reference, amount: studentPayments.amount, currency: studentPayments.currency, firstName: students.firstName, lastName: students.lastName }).from(studentPayments).innerJoin(enrollments, eq(studentPayments.enrollmentId, enrollments.id)).innerJoin(students, eq(enrollments.studentId, students.id)).where(or(like(studentPayments.reference, term), like(students.firstName, term), like(students.lastName, term))).limit(8);
       result.push(...rows.map((row) => ({ id: row.id, category: "finance" as const, title: `Paiement ${row.reference}`, detail: `${row.lastName} ${row.firstName} · ${new Intl.NumberFormat("fr-FR").format(row.amount)} ${row.currency}`, route: "Paiements" })));
     }
     if (showDocuments && ctx.user.role === "admin") {
+      await assertPermission(ctx.user.id, "archives", "view");
       const rows = await db.select({ id: studentDocuments.id, fileName: studentDocuments.fileName, category: studentDocuments.category, fileUrl: studentDocuments.fileUrl }).from(studentDocuments).where(like(studentDocuments.fileName, term)).limit(8);
       result.push(...rows.map((row) => ({ id: row.id, category: "documents" as const, title: row.fileName, detail: row.category, route: "documents", fileUrl: row.fileUrl })));
     }
@@ -108,11 +117,13 @@ export const personalRouter = router({
     const after = input?.createdAfter ? new Date(`${input.createdAfter}T00:00:00.000Z`) : undefined;
     const before = input?.createdBefore ? new Date(`${input.createdBefore}T23:59:59.999Z`) : undefined;
     if (ctx.user.role === "parent") {
+      await assertPermission(ctx.user.id, "results", "view");
       const ids = await parentStudentIds(ctx.user.id);
       if (!ids.length) return [];
       return db.select({ id: studentDocuments.id, fileName: studentDocuments.fileName, category: studentDocuments.category, fileUrl: studentDocuments.fileUrl, createdAt: studentDocuments.createdAt, studentName: students.firstName, studentLastName: students.lastName, classId: classes.id, className: classes.name, yearCode: academicYears.code }).from(studentDocuments).innerJoin(enrollments, eq(studentDocuments.enrollmentId, enrollments.id)).innerJoin(students, eq(enrollments.studentId, students.id)).leftJoin(classes, eq(enrollments.classId, classes.id)).leftJoin(academicYears, eq(classes.academicYearId, academicYears.id)).where(and(inArray(students.id, ids), eq(studentDocuments.parentVisible, true), term ? like(studentDocuments.fileName, term) : undefined, input?.category ? eq(studentDocuments.category, input.category) : undefined, input?.yearCode ? eq(academicYears.code, input.yearCode) : undefined, input?.classId ? eq(classes.id, input.classId) : undefined, after ? gte(studentDocuments.createdAt, after) : undefined, before ? lte(studentDocuments.createdAt, before) : undefined)).orderBy(desc(studentDocuments.createdAt));
     }
     if (ctx.user.role !== "admin") return [];
+    await assertPermission(ctx.user.id, "archives", "view");
     return db.select({ id: studentDocuments.id, fileName: studentDocuments.fileName, category: studentDocuments.category, fileUrl: studentDocuments.fileUrl, createdAt: studentDocuments.createdAt, studentName: students.firstName, studentLastName: students.lastName, classId: classes.id, className: classes.name, yearCode: academicYears.code }).from(studentDocuments).innerJoin(enrollments, eq(studentDocuments.enrollmentId, enrollments.id)).innerJoin(students, eq(enrollments.studentId, students.id)).leftJoin(classes, eq(enrollments.classId, classes.id)).leftJoin(academicYears, eq(classes.academicYearId, academicYears.id)).where(and(term ? like(studentDocuments.fileName, term) : undefined, input?.category ? eq(studentDocuments.category, input.category) : undefined, input?.yearCode ? eq(academicYears.code, input.yearCode) : undefined, input?.classId ? eq(classes.id, input.classId) : undefined, after ? gte(studentDocuments.createdAt, after) : undefined, before ? lte(studentDocuments.createdAt, before) : undefined)).orderBy(desc(studentDocuments.createdAt));
   }),
 });

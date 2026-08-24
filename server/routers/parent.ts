@@ -21,6 +21,7 @@ import {
   userNotifications,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { assertPermission } from "../permissions";
 import { protectedProcedure, router } from "../_core/trpc";
 
 async function database() {
@@ -51,6 +52,7 @@ function parentOnly(role: "user" | "admin" | "parent") {
 export const parentRouter = router({
   children: protectedProcedure.query(async ({ ctx }) => {
     parentOnly(ctx.user.role);
+    await assertPermission(ctx.user.id, "students", "view");
     const db = await database();
     const guardianIds = await linkedGuardianIds(ctx.user.id);
     if (!guardianIds.length) return [];
@@ -82,6 +84,7 @@ export const parentRouter = router({
   }),
   results: protectedProcedure.input(z.object({ enrollmentId: z.number().int().positive(), periodId: z.number().int().positive().optional() })).query(async ({ ctx, input }) => {
     parentOnly(ctx.user.role);
+    await assertPermission(ctx.user.id, "grades", "view");
     const access = await assertParentEnrollment(ctx.user.id, input.enrollmentId);
     if (!access.canViewResults) throw new TRPCError({ code: "FORBIDDEN", message: "La consultation des résultats n’est pas autorisée pour ce responsable." });
     const db = await database();
@@ -96,6 +99,7 @@ export const parentRouter = router({
   }),
   attendance: protectedProcedure.input(z.object({ enrollmentId: z.number().int().positive(), month: z.string().regex(/^\d{4}-\d{2}$/).optional() })).query(async ({ ctx, input }) => {
     parentOnly(ctx.user.role);
+    await assertPermission(ctx.user.id, "attendance", "view");
     await assertParentEnrollment(ctx.user.id, input.enrollmentId);
     const db = await database();
     return db.select({ status: attendanceRecords.status, sessionDate: attendanceSessions.sessionDate }).from(attendanceRecords)
@@ -105,6 +109,7 @@ export const parentRouter = router({
   }),
   finances: protectedProcedure.input(z.object({ enrollmentId: z.number().int().positive() })).query(async ({ ctx, input }) => {
     parentOnly(ctx.user.role);
+    await assertPermission(ctx.user.id, "finance", "view");
     await assertParentEnrollment(ctx.user.id, input.enrollmentId);
     const db = await database();
     const [account] = await db.select().from(enrollmentFinancialAccounts).where(eq(enrollmentFinancialAccounts.enrollmentId, input.enrollmentId)).limit(1);
@@ -113,6 +118,7 @@ export const parentRouter = router({
   }),
   documents: protectedProcedure.input(z.object({ enrollmentId: z.number().int().positive() })).query(async ({ ctx, input }) => {
     parentOnly(ctx.user.role);
+    await assertPermission(ctx.user.id, "results", "view");
     await assertParentEnrollment(ctx.user.id, input.enrollmentId);
     const db = await database();
     return db.select({ id: studentDocuments.id, category: studentDocuments.category, fileName: studentDocuments.fileName, fileUrl: studentDocuments.fileUrl, createdAt: studentDocuments.createdAt }).from(studentDocuments).where(and(eq(studentDocuments.enrollmentId, input.enrollmentId), eq(studentDocuments.parentVisible, true))).orderBy(desc(studentDocuments.createdAt));

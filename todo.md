@@ -88,7 +88,8 @@
 - [ ] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
 - [x] Raccorder les affectations et pondérations administratives au registre persistant, sans données de démonstration.
 - [x] Ajouter le lien sécurisé entre une fiche enseignant et un compte utilisateur pour activer son espace pédagogique.
-- [ ] Exécuter les parcours d’écriture de bout en bout avec un compte administrateur de test.
+- [x] Exécuter les parcours d’écriture de bout en bout avec un compte administrateur de test.
+- [x] Ajouter et exécuter un flux e2e administrateur couvrant registre scolaire, affectation et gouvernance hors deuxième session.
 - [x] Documenter la compatibilité de déploiement Vercel et enregistrer la livraison.
 
 ## Suivi — Modules importés : portail, gouvernance et parcours annuels
@@ -100,12 +101,12 @@
 - [x] Ajouter les espaces de délibération et de décision finale avec historique immuable.
 - [x] Afficher dans le comparatif une décision finale réellement lue depuis la délibération.
 - [x] Ajouter une rectification de délibération auditée, puis l’exposer distinctement dans l’historique.
-- [ ] Ajouter des tests routeur attestant de l’audit généré lors d’une validation ou rectification.
-- [ ] Ajouter un test Vitest de validation créant un audit, puis un test de rectification replaçant la décision à l’état proposé.
+- [x] Ajouter des tests routeur attestant de l’audit généré lors d’une validation ou rectification.
+- [x] Ajouter un test Vitest de validation créant un audit, puis un test de rectification replaçant la décision à l’état proposé.
 - [x] Ajouter les centres personnels : profil, recherche, tâches, documents, aide et notifications selon permissions.
 - [x] Étendre la recherche globale avec les paiements autorisés et une ouverture contextualisée de chaque résultat.
 - [x] Compléter le centre documentaire avec filtres métier et actions de consultation selon permissions.
-- [ ] Tester les autorisations parent/enseignant/administrateur et les calculs académiques associés.
+- [x] Tester les autorisations parent/enseignant/administrateur et les calculs académiques associés.
 
 ## Suivi — Parcours enseignants
 
@@ -126,7 +127,12 @@
 ## Suivi — Contrôle annuel et autorisations fines
 
 - [ ] Appliquer les dérogations de permissions et les rôles d’accès aux opérations sensibles côté serveur.
-- [ ] Étendre les permissions fines aux procédures scolaires et de deuxième session au-delà de la gouvernance.
+- [ ] Établir et vérifier une couverture récapitulative des procédures sensibles protégées par permissions fines.
+- [x] Étendre les permissions fines aux procédures transverses sensibles et les vérifier par route réelle.
+- [x] Étendre les permissions fines aux lectures parent et transverses soumises à autorisation.
+- [x] Tester une dérogation utilisateur sur une opération sensible de route réelle.
+- [x] Vérifier e2e le refus puis le rétablissement d’une route métier après dérogation utilisateur.
+- [x] Étendre les permissions fines aux procédures scolaires et de deuxième session au-delà de la gouvernance.
 - [x] Ajouter des tests Vitest d’autorisation et de refus pour rôle hérité et dérogation utilisateur.
 - [x] Construire le centre de contrôle annuel à partir des états pédagogiques, financiers et de délibération réels.
 - [ ] Vérifier les nouveaux contrôles de permissions et le centre annuel en desktop et mobile.
