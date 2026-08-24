@@ -197,3 +197,22 @@
 - [x] Étendre les permissions fines finance.view/create/edit/validate/cancel/export/print.
 - [x] Couvrir les paiements, plafonds, statuts, taux et conservation historique par des tests.
 - [x] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
+
+## Suivi — Structure du secondaire
+
+- [x] Auditer les classes réellement configurées et leurs inscriptions associées par année scolaire.
+- [x] Corriger sans perte de données la structure en 7e A/B, 8e A/B, puis 1ère à 4e en Littéraire et Scientifique.
+- [x] Vérifier la préparation annuelle et les protections anti-doublons avec cette structure configurée.
+- [x] Vérifier explicitement le refus d’une préparation répétée et d’une inscription annuelle dupliquée avec la structure secondaire corrigée.
+- [x] Vérifier e2e une inscription annuelle dupliquée directement dans une des douze classes de la structure secondaire préparée.
+- [x] Supprimer le fallback de classes codées en dur afin que la gestion affiche exclusivement la structure annuelle persistante.
+- [x] Rendre idempotent le scénario e2e de doublon en nettoyant son inscription temporaire.
+- [x] Valider TypeScript, tests, vérification de données et build.
+- [ ] Synchroniser la correction validée sur GitHub après le checkpoint.
+
+## Suivi — Structure du secondaire (demande répétée)
+
+- [x] Auditer les classes réellement configurées et leurs inscriptions associées par année scolaire.
+- [x] Corriger sans perte de données la structure en 7e A/B, 8e A/B, puis 1ère à 4e en Littéraire et Scientifique.
+- [x] Vérifier la préparation annuelle et les protections anti-doublons avec cette structure configurée.
+- [ ] Valider TypeScript, tests, vérification de données et build, puis synchroniser GitHub.

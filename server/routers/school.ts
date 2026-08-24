@@ -111,7 +111,7 @@ export const schoolRouter = router({
       if (!sourceYear || !targetYear) throw new TRPCError({ code: "NOT_FOUND", message: "Année source ou cible introuvable." });
       if (sourceYear.status !== "archived") throw new TRPCError({ code: "BAD_REQUEST", message: "L’année source doit être archivée avant la préparation de l’année suivante." });
       if (targetYear.status !== "draft") throw new TRPCError({ code: "BAD_REQUEST", message: "L’année cible doit être au statut brouillon avant sa préparation." });
-      const sourceClasses = await db.select().from(classes).where(eq(classes.academicYearId, input.sourceAcademicYearId));
+      const sourceClasses = await db.select().from(classes).where(and(eq(classes.academicYearId, input.sourceAcademicYearId), eq(classes.status, "active")));
       if (!sourceClasses.length) throw new TRPCError({ code: "NOT_FOUND", message: "Aucune classe source à préparer." });
       const targetClasses = await db.select({ id: classes.id }).from(classes).where(eq(classes.academicYearId, input.targetAcademicYearId)).limit(1);
       if (targetClasses.length) throw new TRPCError({ code: "CONFLICT", message: "L’année cible contient déjà des classes ; sa préparation doit rester explicite." });
@@ -222,7 +222,7 @@ export const schoolRouter = router({
     }),
   }),
   classes: router({
-    list: adminProcedure.input(z.object({ academicYearId: z.number().int().positive() })).query(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "enrollments", "view"); return (await database()).select().from(classes).where(eq(classes.academicYearId, input.academicYearId)).orderBy(asc(classes.level), asc(classes.name)); }),
+    list: adminProcedure.input(z.object({ academicYearId: z.number().int().positive(), includeDraft: z.boolean().default(false) })).query(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "enrollments", "view"); const db = await database(); return db.select().from(classes).where(input.includeDraft ? eq(classes.academicYearId, input.academicYearId) : and(eq(classes.academicYearId, input.academicYearId), eq(classes.status, "active"))).orderBy(asc(classes.level), asc(classes.name)); }),
     create: adminProcedure.input(schoolInputs.classCreate).mutation(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "enrollments", "create"); const db = await database(); await db.insert(classes).values({ ...input, status: "draft" }); return { ok: true }; }),
   }),
   courses: router({
