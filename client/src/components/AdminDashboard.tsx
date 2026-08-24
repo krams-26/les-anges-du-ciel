@@ -1,181 +1,81 @@
 /**
- * Direction visuelle : « Registre diocésain contemporain » — un poste de pilotage
- * pour la direction, bâti en bandes de dossier et indicateurs Cobalt Kinshasa.
+ * Direction visuelle : « Registre diocésain contemporain » — le poste de pilotage
+ * conserve sa mise en page existante, alimentée par les registres annuels persistants.
  */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { QuickActionModal } from "@/components/QuickActionModal";
 import type { QuickActionKey } from "@/components/QuickActionModal";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
-  ArrowRight,
-  BadgeCheck,
-  Banknote,
-  BellRing,
-  BookOpenCheck,
-  CheckCircle2,
-  ChevronRight,
-  CircleAlert,
-  ClipboardPenLine,
-  Clock3,
-  FileSpreadsheet,
-  GraduationCap,
-  Landmark,
-  Plus,
-  ReceiptText,
-  ShieldCheck,
-  UserPlus,
-  UsersRound,
-  WalletCards,
-} from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { BadgeCheck, Banknote, BellRing, BookOpenCheck, CheckCircle2, ChevronRight, CircleAlert, ClipboardPenLine, Clock3, FileSpreadsheet, GraduationCap, Landmark, Plus, ReceiptText, Search, ShieldCheck, UserPlus, UsersRound, WalletCards } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const attendanceData = [
-  { day: "Lun.", rate: 92.8 },
-  { day: "Mar.", rate: 94.1 },
-  { day: "Mer.", rate: 95.3 },
-  { day: "Jeu.", rate: 93.7 },
-  { day: "Ven.", rate: 94.2 },
-];
-
-const performanceData = [
-  { className: "7e A", score: 15.8 },
-  { className: "7e B", score: 14.6 },
-  { className: "8e A", score: 13.9 },
-  { className: "8e B", score: 15.1 },
-  { className: "6e A", score: 14.3 },
-];
-
-const academics = [
-  { label: "Notes à saisir", value: "17", helper: "évaluations ouvertes", tone: "blue", status: "À traiter" },
-  { label: "Notes soumises", value: "31", helper: "en attente de contrôle", tone: "green", status: "Soumises" },
-  { label: "Notes à valider", value: "8", helper: "validation direction", tone: "gold", status: "Prioritaire" },
-  { label: "Rapports enseignants", value: "6", helper: "rapports à compléter", tone: "slate", status: "À relancer" },
-];
-
-const alerts = [
-  { level: "attention", text: "17 notes sont encore en attente de soumission.", target: "Notes" },
-  { level: "warning", text: "8 notes attendent une validation.", target: "Notes" },
-  { level: "attention", text: "6 rapports enseignants doivent être complétés.", target: "Rapports" },
-  { level: "risk", text: "3 élèves présentent un solde important.", target: "Soldes" },
-];
-
-const activities: { icon: LucideIcon; title: string; detail: string; time: string; tone: string }[] = [
-  { icon: Banknote, title: "Paiement enregistré", detail: "KAS-2026-084 · 185 000 CDF · Mireille Kalume", time: "Il y a 12 min", tone: "green" },
-  { icon: ClipboardPenLine, title: "Note corrigée", detail: "Mathématiques · 7e A · Mme Nathalie Lumbala", time: "Il y a 28 min", tone: "blue" },
-  { icon: UserPlus, title: "Élève inscrit", detail: "David Mukendi · 8e B · Dossier complet", time: "Il y a 1 h", tone: "slate" },
-  { icon: GraduationCap, title: "Enseignant affecté", detail: "M. Alain Kanku · Sciences · 6e A", time: "Il y a 2 h", tone: "blue" },
-  { icon: FileSpreadsheet, title: "Relevé généré", detail: "7e A · Premier trimestre · 32 élèves", time: "Aujourd’hui, 09:10", tone: "gold" },
-];
+type Activity = { icon: LucideIcon; title: string; detail: string; time: string; tone: string };
 
 function StatStrip({ icon: Icon, label, value, detail, color }: { icon: LucideIcon; label: string; value: string; detail: string; color: "blue" | "green" | "gold" | "slate" }) {
-  return (
-    <article className={`admin-stat-strip admin-stat-${color}`}>
-      <span className="admin-stat-icon"><Icon size={18} /></span>
-      <div><p>{label}</p><strong>{value}</strong><small>{detail}</small></div>
-    </article>
-  );
+  return <article className={`admin-stat-strip admin-stat-${color}`}><span className="admin-stat-icon"><Icon size={18} /></span><div><p>{label}</p><strong>{value}</strong><small>{detail}</small></div></article>;
 }
 
 function FinanceLine({ label, value, sub, emphasis = false }: { label: string; value: string; sub: string; emphasis?: boolean }) {
   return <div className={`finance-line ${emphasis ? "is-emphasis" : ""}`}><span><strong>{label}</strong><small>{sub}</small></span><b>{value}</b></div>;
 }
 
-export function AdminDashboard({ onNavigate, onAction }: { onNavigate: (label: string) => void; onAction: (title: string, detail: string) => void }) {
+const formatAmount = (value: number) => `${value.toLocaleString("fr-FR")} CDF`;
+const formatPercent = (value: number | null) => value === null ? "—" : `${String(value).replace(".", ",")} %`;
+const secondarySections = ["Secondaire", "Littéraire", "Scientifique"];
+const actionTitle = (action: string) => ({ finance_payment_created: "Paiement enregistré", finance_payment_validated: "Paiement validé", annual_enrollment_transitioned: "Inscription annuelle", annual_enrollment_exit_recorded: "Sortie annuelle", grade_updated: "Note enregistrée", teacher_assignment_created: "Enseignant affecté" }[action] ?? action.replace(/_/g, " "));
+const activityIcon = (action: string) => action.includes("payment") ? Banknote : action.includes("grade") ? ClipboardPenLine : action.includes("enrollment") ? UserPlus : action.includes("assignment") ? GraduationCap : FileSpreadsheet;
+
+export function AdminDashboard({ onNavigate, onAction, academicYearCode }: { onNavigate: (label: string) => void; onAction: (title: string, detail: string) => void; academicYearCode?: string }) {
   const [quickAction, setQuickAction] = useState<QuickActionKey | null>(() => {
     const requested = new URLSearchParams(window.location.search).get("action");
     return requested === "student" || requested === "payment" || requested === "assignment" || requested === "grade" || requested === "report" ? requested : null;
   });
-  return (
-    <section className="admin-dashboard" aria-label="Tableau de bord administrateur">
-      <header className="admin-dashboard-heading">
-        <div>
-          <div className="heading-kicker"><span className="admin-monogram"><ShieldCheck size={15} /></span> Direction de l’établissement</div>
-          <h1>Bonjour, Administrateur</h1>
-          <p>Voici un aperçu de l’activité de l’établissement.</p>
-        </div>
-        <div className="admin-context-block"><span>Contexte en cours</span><strong>Année scolaire : 2026-2027</strong><small>Section principale : Secondaire</small></div>
-      </header>
+  const [section, setSection] = useState("Secondaire");
+  const [classFilter, setClassFilter] = useState("all");
+  const [rosterSearch, setRosterSearch] = useState("");
+  const yearsQuery = trpc.school.years.list.useQuery();
+  const academicYear = yearsQuery.data?.find((year) => year.code === academicYearCode) ?? yearsQuery.data?.find((year) => year.status === "active") ?? yearsQuery.data?.[0];
+  const summaryQuery = trpc.annualControl.summary.useQuery({ academicYearId: academicYear?.id ?? 0 }, { enabled: Boolean(academicYear) });
+  const classSummariesQuery = trpc.academic.yearClassSummaries.useQuery({ academicYearId: academicYear?.id ?? 0 }, { enabled: Boolean(academicYear) });
+  const studentsQuery = trpc.school.students.list.useQuery({ academicYearId: academicYear?.id ?? 0 }, { enabled: Boolean(academicYear) });
+  const assignmentsQuery = trpc.school.assignments.list.useQuery();
+  const classSummaries = classSummariesQuery.data ?? [];
+  const sections = useMemo(() => ["Secondaire", ...Array.from(new Set(classSummaries.map((item) => item.section).filter((item) => item !== "Secondaire")))] , [classSummaries]);
+  const classesForSection = useMemo(() => classSummaries.filter((item) => section === "Secondaire" ? secondarySections.includes(item.section) : item.section === section), [classSummaries, section]);
+  useEffect(() => { if (sections.length && !sections.includes(section)) setSection(sections[0]); }, [section, sections]);
+  useEffect(() => { if (classFilter !== "all" && !classesForSection.some((item) => String(item.id) === classFilter)) setClassFilter("all"); }, [classFilter, classesForSection]);
+  const selectedClass = classesForSection.find((item) => String(item.id) === classFilter) ?? classesForSection[0] ?? null;
+  const selectedClassId = classFilter === "all" ? selectedClass?.id : Number(classFilter);
+  const roster = useMemo(() => (studentsQuery.data ?? []).filter((student): student is typeof student & { enrollmentId: number; enrollmentStatus: string; classId: number | null; className: string | null; expectedAmount: number | null; paidAmount: number | null } => "enrollmentId" in student).filter((student) => student.classId === selectedClassId && `${student.firstName} ${student.lastName} ${student.studentCode}`.toLowerCase().includes(rosterSearch.trim().toLowerCase())), [rosterSearch, selectedClassId, studentsQuery.data]);
+  const stats = summaryQuery.data;
+  const sectionStudentCount = classesForSection.reduce((total, item) => total + item.activeStudentCount, 0);
+  const activeTeachers = useMemo(() => Array.from(new Set((assignmentsQuery.data ?? []).filter((assignment) => assignment.status === "active" && classesForSection.some((schoolClass) => schoolClass.name === assignment.className)).map((assignment) => assignment.teacherId))).length, [assignmentsQuery.data, classesForSection]);
+  const attendanceData = stats?.attendance.rate === null || stats?.attendance.rate === undefined ? [] : [{ day: "Registre", rate: stats.attendance.rate }];
+  const performanceData = classesForSection.map((schoolClass) => ({ className: schoolClass.name.replace(" — Test", ""), score: schoolClass.averagePercentage === null ? 0 : Math.round((schoolClass.averagePercentage / 5) * 100) / 100 }));
+  const activities: Activity[] = (stats?.recentEvents ?? []).map((event) => ({ icon: activityIcon(event.action), title: actionTitle(event.action), detail: `${event.module}${event.resourceType ? ` · ${event.resourceType}` : ""}`, time: new Date(event.createdAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }), tone: event.module === "finance" ? "green" : event.module === "school" ? "slate" : "blue" }));
+  const alerts = [
+    { level: "attention", text: `${stats?.grades.draft ?? 0} note(s) sont encore en attente de soumission.`, target: "Notes", visible: (stats?.grades.draft ?? 0) > 0 },
+    { level: "warning", text: `${stats?.grades.submitted ?? 0} note(s) attendent une validation.`, target: "Validation des notes", visible: (stats?.grades.submitted ?? 0) > 0 },
+    { level: "attention", text: `${stats?.reports.draft ?? 0} rapport(s) enseignant(s) doivent être complétés.`, target: "Suivi des saisies", visible: (stats?.reports.draft ?? 0) > 0 },
+    { level: "risk", text: `${formatAmount(stats?.finance.remainingAmount ?? 0)} restent à régulariser.`, target: "Soldes", visible: (stats?.finance.remainingAmount ?? 0) > 0 },
+  ].filter((alert) => alert.visible);
+  const loading = yearsQuery.isLoading || summaryQuery.isLoading || classSummariesQuery.isLoading;
 
-      <section className="admin-stat-band" aria-label="Statistiques principales">
-        <StatStrip icon={UsersRound} label="Élèves actifs" value="842" detail="17 admissions ce mois" color="blue" />
-        <StatStrip icon={GraduationCap} label="Enseignants" value="64" detail="61 affectés ce jour" color="slate" />
-        <StatStrip icon={Landmark} label="Classes" value="28" detail="Secondaire et primaire" color="gold" />
-        <StatStrip icon={BadgeCheck} label="Taux de présence" value="94,2 %" detail="+0,8 point vs. lundi" color="green" />
-      </section>
-
-      <section className="admin-main-grid">
-        <article className="admin-record academic-record">
-          <div className="record-heading"><div><p className="eyebrow">Pilotage académique</p><h2>Situation des évaluations</h2></div><button onClick={() => onNavigate("Évaluations")}>Voir le registre <ChevronRight size={15} /></button></div>
-          <div className="academic-status-grid">
-            {academics.map((item) => <div className={`academic-status academic-${item.tone}`} key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.helper}</small><Badge className={`status-badge ${item.tone === "green" ? "success" : item.tone === "gold" ? "warning" : "info"}`}>{item.status}</Badge></div>)}
-          </div>
-        </article>
-
-        <article className="admin-record finance-record">
-          <div className="record-heading"><div><p className="eyebrow">Vue financière</p><h2>Frais scolaires · 2026-2027</h2></div><button onClick={() => onNavigate("Paiements")}>Ouvrir les paiements <ChevronRight size={15} /></button></div>
-          <div className="finance-progress"><div className="finance-progress-rail"><i /></div><span><strong>74 %</strong> de l’objectif annuel encaissé</span></div>
-          <div className="finance-lines">
-            <FinanceLine label="Frais attendus" value="124 800 000 CDF" sub="Objectif annuel consolidé" />
-            <FinanceLine label="Montant encaissé" value="92 418 000 CDF" sub="Depuis le début de l’année" emphasis />
-            <FinanceLine label="Solde restant" value="32 382 000 CDF" sub="À régulariser" />
-            <FinanceLine label="Paiements du jour" value="3 860 000 CDF" sub="26 opérations validées" />
-          </div>
-        </article>
-      </section>
-
-      <section className="admin-analytics-grid">
-        <article className="admin-record chart-record attendance-record">
-          <div className="record-heading"><div><p className="eyebrow">Assiduité</p><h2>Présence · semaine en cours</h2></div><div className="chart-value"><strong>94,2 %</strong><span>aujourd’hui</span></div></div>
-          <div className="chart-note"><span className="chart-legend blue" />Élèves présents sur les cinq derniers jours ouvrés</div>
-          <div className="chart-frame" aria-label="Tendance du taux de présence du lundi au vendredi">
-            <ResponsiveContainer width="100%" height="100%"><AreaChart data={attendanceData} margin={{ top: 14, right: 7, left: -20, bottom: 0 }}><defs><linearGradient id="attendanceFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1f4a8a" stopOpacity={0.27} /><stop offset="100%" stopColor="#1f4a8a" stopOpacity={0.02} /></linearGradient></defs><CartesianGrid vertical={false} stroke="#e7edf3" strokeDasharray="3 3" /><XAxis dataKey="day" tick={{ fill: "#7c8a9b", fontSize: 10, fontWeight: 700 }} tickLine={false} axisLine={false} /><YAxis domain={[90, 97]} ticks={[90, 92, 94, 96]} tickFormatter={(value) => `${value} %`} tick={{ fill: "#8b97a6", fontSize: 9 }} tickLine={false} axisLine={false} /><Tooltip formatter={(value: number) => [`${String(value).replace(".", ",")} %`, "Présence"]} labelStyle={{ color: "#526277", fontSize: 11, fontWeight: 700 }} contentStyle={{ border: "1px solid #dbe4ef", borderRadius: "5px", boxShadow: "0 8px 18px rgba(34,52,77,.10)", fontSize: 11 }} /><Area isAnimationActive={false} type="monotone" dataKey="rate" stroke="#1f4a8a" strokeWidth={2.3} fill="url(#attendanceFill)" activeDot={{ r: 4, fill: "#1f4a8a", stroke: "#fff", strokeWidth: 2 }} /></AreaChart></ResponsiveContainer>
-          </div>
-        </article>
-
-        <article className="admin-record chart-record performance-record">
-          <div className="record-heading"><div><p className="eyebrow">Performance académique</p><h2>Moyenne par classe · Secondaire</h2></div><button onClick={() => onNavigate("Résultats")}>Détails <ChevronRight size={15} /></button></div>
-          <div className="chart-note"><span className="chart-legend gold" />Moyenne générale sur 20 · évaluation trimestrielle</div>
-          <div className="chart-frame" aria-label="Moyenne académique par classe de la section secondaire">
-            <ResponsiveContainer width="100%" height="100%"><BarChart data={performanceData} margin={{ top: 12, right: 5, left: -20, bottom: 0 }} barCategoryGap="34%"><CartesianGrid vertical={false} stroke="#e7edf3" strokeDasharray="3 3" /><XAxis dataKey="className" tick={{ fill: "#7c8a9b", fontSize: 10, fontWeight: 700 }} tickLine={false} axisLine={false} /><YAxis domain={[0, 20]} ticks={[0, 5, 10, 15, 20]} tick={{ fill: "#8b97a6", fontSize: 9 }} tickLine={false} axisLine={false} /><Tooltip formatter={(value: number) => [`${String(value).replace(".", ",")} / 20`, "Moyenne"]} labelStyle={{ color: "#526277", fontSize: 11, fontWeight: 700 }} contentStyle={{ border: "1px solid #dbe4ef", borderRadius: "5px", boxShadow: "0 8px 18px rgba(34,52,77,.10)", fontSize: 11 }} /><Bar isAnimationActive={false} dataKey="score" fill="#b7831f" radius={[2, 2, 0, 0]} maxBarSize={25} /></BarChart></ResponsiveContainer>
-          </div>
-        </article>
-      </section>
-
-      <section className="admin-lower-grid">
-        <article className="admin-record alerts-record">
-          <div className="record-heading"><div><p className="eyebrow">Alertes opérationnelles</p><h2>Éléments nécessitant une décision</h2></div><BellRing size={18} className="record-heading-icon" /></div>
-          <div className="alerts-list">{alerts.map((alert) => <button className={`alert-row alert-${alert.level}`} key={alert.text} onClick={() => onNavigate(alert.target)}><span>{alert.level === "risk" ? <CircleAlert size={16} /> : <Clock3 size={16} />}</span><strong>{alert.text}</strong><ChevronRight size={16} /></button>)}</div>
-        </article>
-
-        <article className="admin-record activity-record">
-          <div className="record-heading"><div><p className="eyebrow">Activité récente</p><h2>Journal de l’établissement</h2></div><button onClick={() => onNavigate("Archives")}>Journal complet <ChevronRight size={15} /></button></div>
-          <div className="activity-list">{activities.map((activity) => { const Icon = activity.icon; return <div className="activity-row" key={activity.title}><span className={`activity-icon ${activity.tone}`}><Icon size={15} /></span><div><strong>{activity.title}</strong><small>{activity.detail}</small></div><time>{activity.time}</time></div>; })}</div>
-        </article>
-      </section>
-
-      <section className="quick-actions-band" aria-label="Actions rapides">
-        <div><p className="eyebrow">Actions rapides</p><h2>Créer ou enregistrer sans quitter le poste de pilotage.</h2></div>
-        <div className="quick-actions">
-          <Button className="primary-action" onClick={() => setQuickAction("student")}><Plus size={15} /> Ajouter un élève</Button>
-          <Button variant="outline" className="secondary-action" onClick={() => setQuickAction("payment")}><WalletCards size={15} /> Enregistrer un paiement</Button>
-          <Button variant="outline" className="secondary-action" onClick={() => setQuickAction("assignment")}><GraduationCap size={15} /> Affecter un enseignant</Button>
-          <Button variant="outline" className="secondary-action" onClick={() => setQuickAction("grade")}><BookOpenCheck size={15} /> Saisir une note</Button>
-          <Button variant="outline" className="secondary-action" onClick={() => setQuickAction("report")}><ReceiptText size={15} /> Générer un relevé</Button>
-        </div>
-      </section>
-      <QuickActionModal action={quickAction} onClose={() => setQuickAction(null)} onSuccess={onAction} />
-    </section>
-  );
+  return <section className="admin-dashboard" aria-label="Tableau de bord administrateur">
+    <header className="admin-dashboard-heading"><div><div className="heading-kicker"><span className="admin-monogram"><ShieldCheck size={15} /></span> Direction de l’établissement</div><h1>Bonjour, Administrateur</h1><p>Voici un aperçu de l’activité de l’établissement.</p></div><div className="admin-context-block"><span>Contexte en cours</span><strong>Année scolaire : {academicYear?.code ?? "—"}</strong><small>Section principale : {section}</small></div></header>
+    <section className="class-filter-bar" aria-label="Filtres du tableau de bord"><span>Filtres</span><Select value={section} onValueChange={setSection}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{sections.map((item) => <SelectItem key={item} value={item}>Section : {item}</SelectItem>)}</SelectContent></Select><Select value={classFilter} onValueChange={setClassFilter}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Classe : Vue d’ensemble</SelectItem>{classesForSection.map((item) => <SelectItem key={item.id} value={String(item.id)}>Classe : {item.name}</SelectItem>)}</SelectContent></Select></section>
+    {loading ? <div className="student-loading-state"><strong>Consolidation des données annuelles…</strong><span>Les indicateurs du tableau de bord sont calculés depuis les registres persistants.</span></div> : <>
+      <section className="admin-stat-band" aria-label="Statistiques principales"><StatStrip icon={UsersRound} label="Élèves actifs" value={String(sectionStudentCount)} detail={`${classesForSection.length} classe(s) dans la section`} color="blue" /><StatStrip icon={GraduationCap} label="Enseignants affectés" value={String(activeTeachers)} detail="Affectations actives de la section" color="slate" /><StatStrip icon={Landmark} label="Classes" value={String(classesForSection.length)} detail={`sur ${classSummaries.length} classe(s) actives`} color="gold" /><StatStrip icon={BadgeCheck} label="Taux de présence" value={formatPercent(stats?.attendance.rate ?? null)} detail={stats?.attendance.totalRecords ? `${stats.attendance.presentOrLateRecords} présence(s) ou retard(s) enregistrés` : "Aucune présence soumise"} color="green" /></section>
+      <section className="admin-main-grid"><article className="admin-record academic-record"><div className="record-heading"><div><p className="eyebrow">Pilotage académique</p><h2>Situation des évaluations</h2></div><button onClick={() => onNavigate("Évaluations")}>Voir le registre <ChevronRight size={15} /></button></div><div className="academic-status-grid"><div className="academic-status academic-blue"><span>Notes à saisir</span><strong>{stats?.grades.draft ?? 0}</strong><small>évaluations en brouillon</small><Badge className="status-badge info">À traiter</Badge></div><div className="academic-status academic-green"><span>Notes soumises</span><strong>{stats?.grades.submitted ?? 0}</strong><small>en attente de contrôle</small><Badge className="status-badge success">Soumises</Badge></div><div className="academic-status academic-gold"><span>Notes validées</span><strong>{stats?.grades.validated ?? 0}</strong><small>validées dans l’année</small><Badge className="status-badge warning">Validées</Badge></div><div className="academic-status academic-slate"><span>Rapports enseignants</span><strong>{stats?.reports.draft ?? 0}</strong><small>rapports à compléter</small><Badge className="status-badge info">À relancer</Badge></div></div></article><article className="admin-record finance-record"><div className="record-heading"><div><p className="eyebrow">Vue financière</p><h2>Frais scolaires · {academicYear?.code ?? "—"}</h2></div><button onClick={() => onNavigate("Paiements")}>Ouvrir les paiements <ChevronRight size={15} /></button></div><div className="finance-progress"><div className="finance-progress-rail"><i style={{ width: `${Math.min(100, stats?.finance.collectionRate ?? 0)}%` }} /></div><span><strong>{formatPercent(stats?.finance.collectionRate ?? 0)}</strong> de l’objectif annuel encaissé</span></div><div className="finance-lines"><FinanceLine label="Frais attendus" value={formatAmount(stats?.finance.expectedAmount ?? 0)} sub="Objectif annuel consolidé" /><FinanceLine label="Montant encaissé" value={formatAmount(stats?.finance.paidAmount ?? 0)} sub="Depuis le début de l’année" emphasis /><FinanceLine label="Solde restant" value={formatAmount(stats?.finance.remainingAmount ?? 0)} sub="À régulariser" /><FinanceLine label="Paiements du jour" value="—" sub="Indicateur disponible dans le registre Paiements" /></div></article></section>
+      <section className="admin-analytics-grid"><article className="admin-record chart-record attendance-record"><div className="record-heading"><div><p className="eyebrow">Assiduité</p><h2>Présence enregistrée</h2></div><div className="chart-value"><strong>{formatPercent(stats?.attendance.rate ?? null)}</strong><span>registre annuel</span></div></div><div className="chart-note"><span className="chart-legend blue" />Présences et retards enregistrés dans le contexte annuel</div><div className="chart-frame" aria-label="Taux de présence annualisé"><ResponsiveContainer width="100%" height="100%"><AreaChart data={attendanceData} margin={{ top: 14, right: 7, left: -20, bottom: 0 }}><defs><linearGradient id="attendanceFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1f4a8a" stopOpacity={0.27} /><stop offset="100%" stopColor="#1f4a8a" stopOpacity={0.02} /></linearGradient></defs><CartesianGrid vertical={false} stroke="#e7edf3" strokeDasharray="3 3" /><XAxis dataKey="day" tick={{ fill: "#7c8a9b", fontSize: 10, fontWeight: 700 }} tickLine={false} axisLine={false} /><YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(value) => `${value} %`} tick={{ fill: "#8b97a6", fontSize: 9 }} tickLine={false} axisLine={false} /><Tooltip formatter={(value: number) => [`${String(value).replace(".", ",")} %`, "Présence"]} /><Area isAnimationActive={false} type="monotone" dataKey="rate" stroke="#1f4a8a" strokeWidth={2.3} fill="url(#attendanceFill)" activeDot={{ r: 4, fill: "#1f4a8a", stroke: "#fff", strokeWidth: 2 }} /></AreaChart></ResponsiveContainer></div></article><article className="admin-record chart-record performance-record"><div className="record-heading"><div><p className="eyebrow">Performance académique</p><h2>Moyenne par classe · {section}</h2></div><button onClick={() => onNavigate("Résultats classe")}>Détails <ChevronRight size={15} /></button></div><div className="chart-note"><span className="chart-legend gold" />Moyenne générale calculée par le moteur académique sur 20</div><div className="chart-frame" aria-label="Moyenne académique par classe"><ResponsiveContainer width="100%" height="100%"><BarChart data={performanceData} margin={{ top: 12, right: 5, left: -20, bottom: 0 }} barCategoryGap="34%"><CartesianGrid vertical={false} stroke="#e7edf3" strokeDasharray="3 3" /><XAxis dataKey="className" tick={{ fill: "#7c8a9b", fontSize: 10, fontWeight: 700 }} tickLine={false} axisLine={false} /><YAxis domain={[0, 20]} ticks={[0, 5, 10, 15, 20]} tick={{ fill: "#8b97a6", fontSize: 9 }} tickLine={false} axisLine={false} /><Tooltip formatter={(value: number) => [`${String(value).replace(".", ",")} / 20`, "Moyenne"]} /><Bar isAnimationActive={false} dataKey="score" fill="#b7831f" radius={[2, 2, 0, 0]} maxBarSize={25} /></BarChart></ResponsiveContainer></div></article></section>
+      <section className="operational-grid"><article className="module-card roster-card"><div className="module-card-header"><div><p className="eyebrow">Suivi de classe</p><h2>{selectedClass?.name ?? "Aucune classe"} · Registre annuel</h2></div><button className="icon-button" onClick={() => onNavigate("Classes")} aria-label="Ouvrir la gestion des classes"><ChevronRight size={19} /></button></div><div className="table-toolbar"><div className="inline-search"><Search size={16} /><input value={rosterSearch} onChange={(event) => setRosterSearch(event.target.value)} placeholder="Rechercher un élève" aria-label="Rechercher un élève" /></div><button className="quiet-action" onClick={() => onNavigate("Élèves")}>Ouvrir le registre</button></div><div className="responsive-table-wrap"><table className="admin-table"><thead><tr><th>Élève</th><th>Classe</th><th>Statut</th><th>Solde</th></tr></thead><tbody>{roster.slice(0, 5).map((student) => { const balance = Math.max(0, (student.expectedAmount ?? 0) - (student.paidAmount ?? 0)); return <tr key={student.enrollmentId}><td data-label="Élève"><div className="student-cell"><span className={`avatar avatar-${student.sex.toLowerCase()}`}>{`${student.firstName[0]}${student.lastName[0]}`}</span><span><strong>{student.firstName} {student.lastName}</strong><small>{student.studentCode}</small></span></div></td><td data-label="Classe"><strong>{student.className ?? "Non affectée"}</strong></td><td data-label="Statut"><Badge className={student.enrollmentStatus === "active" ? "status-badge success" : "status-badge warning"}>{student.enrollmentStatus === "active" ? "Actif" : student.enrollmentStatus}</Badge></td><td data-label="Solde"><strong>{balance ? formatAmount(balance) : "À jour"}</strong></td></tr>; })}{!roster.length && <tr><td colSpan={4}>Aucune inscription active pour ce filtre.</td></tr>}</tbody></table></div><footer className="card-footer"><span>{roster.length} inscription(s) affichée(s)</span><button className="quiet-action" onClick={() => onNavigate("Élèves")}>Voir tous les élèves</button></footer></article><div className="side-modules"><article className="dossier-brief coordination-brief"><div className="dossier-brief-rule" /><div className="dossier-brief-heading"><span className="dossier-seal"><CheckCircle2 size={16} /></span><p className="eyebrow">Pédagogie · Registre annuel</p></div><div className="dossier-brief-body"><div><h2>{stats?.reports.draft ?? 0} rapport(s) à relire</h2><p>Rapports encore enregistrés en brouillon pour cette année.</p></div><button onClick={() => onNavigate("Suivi des saisies")}>Ouvrir le suivi <ChevronRight size={15} /></button></div></article><article className="finance-card"><div className="finance-card-content"><div><p className="eyebrow">Finance · Dossier annuel</p><h2>{formatPercent(stats?.finance.collectionRate ?? 0)} des frais réglés</h2></div><button className="text-action" onClick={() => onNavigate("Paiements")}>Consulter <ChevronRight size={15} /></button></div></article></div></section>
+      <section className="admin-lower-grid"><article className="admin-record alerts-record"><div className="record-heading"><div><p className="eyebrow">Alertes opérationnelles</p><h2>Éléments nécessitant une décision</h2></div><BellRing size={18} className="record-heading-icon" /></div><div className="alerts-list">{alerts.length ? alerts.map((alert) => <button className={`alert-row alert-${alert.level}`} key={alert.text} onClick={() => onNavigate(alert.target)}><span>{alert.level === "risk" ? <CircleAlert size={16} /> : <Clock3 size={16} />}</span><strong>{alert.text}</strong><ChevronRight size={16} /></button>) : <div className="alert-row alert-attention"><span><CheckCircle2 size={16} /></span><strong>Aucune alerte bloquante dans les registres disponibles.</strong></div>}</div></article><article className="admin-record activity-record"><div className="record-heading"><div><p className="eyebrow">Activité récente</p><h2>Journal de l’établissement</h2></div><button onClick={() => onNavigate("Archives")}>Journal complet <ChevronRight size={15} /></button></div><div className="activity-list">{activities.length ? activities.map((activity) => { const Icon = activity.icon; return <div className="activity-row" key={`${activity.title}-${activity.time}`}><span className={`activity-icon ${activity.tone}`}><Icon size={15} /></span><div><strong>{activity.title}</strong><small>{activity.detail}</small></div><time>{activity.time}</time></div>; }) : <div className="activity-row"><span className="activity-icon slate"><Clock3 size={15} /></span><div><strong>Aucune activité auditée</strong><small>Les nouvelles opérations apparaîtront ici après leur enregistrement.</small></div></div>}</div></article></section>
+      <section className="quick-actions-band" aria-label="Actions rapides"><div><p className="eyebrow">Actions rapides</p><h2>Créer ou enregistrer sans quitter le poste de pilotage.</h2></div><div className="quick-actions"><Button className="primary-action" onClick={() => setQuickAction("student")}><Plus size={15} /> Ajouter un élève</Button><Button variant="outline" className="secondary-action" onClick={() => setQuickAction("payment")}><WalletCards size={15} /> Enregistrer un paiement</Button><Button variant="outline" className="secondary-action" onClick={() => setQuickAction("assignment")}><GraduationCap size={15} /> Affecter un enseignant</Button><Button variant="outline" className="secondary-action" onClick={() => setQuickAction("grade")}><BookOpenCheck size={15} /> Saisir une note</Button><Button variant="outline" className="secondary-action" onClick={() => setQuickAction("report")}><ReceiptText size={15} /> Générer un relevé</Button></div></section>
+    </>}
+    <QuickActionModal action={quickAction} onClose={() => setQuickAction(null)} onSuccess={onAction} onNavigate={onNavigate} />
+  </section>;
 }

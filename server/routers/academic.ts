@@ -22,6 +22,18 @@ async function database() {
 
 /** API commune pour résultats, relevés, dashboard et statistiques administratives. */
 export const academicRouter = router({
+  yearClassSummaries: adminProcedure.input(z.object({ academicYearId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+    await assertPermission(ctx.user.id, "results", "view");
+    const db = await database();
+    const yearClasses = await db.select({ id: classes.id, name: classes.name, level: classes.level, section: classes.section }).from(classes).where(and(eq(classes.academicYearId, input.academicYearId), eq(classes.status, "active")));
+    const activeEnrollments = await db.select({ id: enrollments.id, classId: enrollments.classId }).from(enrollments).where(and(eq(enrollments.academicYearId, input.academicYearId), eq(enrollments.status, "active")));
+    const annualResults = await getAcademicResultsForYear(db, input.academicYearId, { type: "annual" });
+    return yearClasses.map((schoolClass) => {
+      const enrollmentIds = activeEnrollments.filter((enrollment) => enrollment.classId === schoolClass.id).map((enrollment) => enrollment.id);
+      const percentages = annualResults.filter((result) => enrollmentIds.includes(result.enrollmentId) && result.percentage !== null).map((result) => result.percentage as number);
+      return { ...schoolClass, activeStudentCount: enrollmentIds.length, averagePercentage: percentages.length ? Math.round((percentages.reduce((total, percentage) => total + percentage, 0) / percentages.length) * 100) / 100 : null, completedStudentCount: annualResults.filter((result) => enrollmentIds.includes(result.enrollmentId) && result.status === "complete").length };
+    });
+  }),
   classResults: adminProcedure.input(z.object({ classId: z.number().int().positive(), scope: scopeInput })).query(async ({ ctx, input }) => {
     await assertPermission(ctx.user.id, "results", "view");
     const db = await database();

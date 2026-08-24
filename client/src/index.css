@@ -257,3 +257,7 @@
   @media (max-width: 620px) { .second-session-comparison { margin-inline: 14px; grid-template-columns: 1fr; }.second-session-comparison > span { min-height: 61px; border-left: 0; border-top: 1px solid #dfe7ef; }.second-session-comparison > span:first-child { border-top: 0; }.second-session-assessments .second-session-table-wrap { margin-inline: 14px; }.second-session-assessments .second-session-actions [role="combobox"] { width: 100%; }.second-session-history { margin-inline: 14px; }.second-session-history > div { grid-template-columns: 21px 1fr; }.second-session-history time { grid-column: 2; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 }
+/* Le registre élèves conserve le style du filtre existant, mais les options historiques sont remplacées par la ligne dynamique. */
+.student-controls .student-search + .student-filter-row:not(.dynamic-student-filters) {
+  display: none;
+}

@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
-import { and, count, eq, sum } from "drizzle-orm";
+import { and, count, desc, eq, sum } from "drizzle-orm";
 import { z } from "zod";
-import { academicYears, classes, deliberationDecisions, deliberationSessions, enrollmentFinancialAccounts, enrollments, grades, secondSessionSettings, teacherReports, teachingAssignments, classCourses } from "../../drizzle/schema";
+import { academicYears, attendanceRecords, attendanceSessions, auditEvents, classes, deliberationDecisions, deliberationSessions, enrollmentFinancialAccounts, enrollments, grades, secondSessionSettings, teacherReports, teachingAssignments, classCourses } from "../../drizzle/schema";
 import { adminProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { getAcademicResultsForYear } from "../academicResults";
@@ -33,6 +33,8 @@ export const annualControlRouter = router({
     const [reportsSubmitted] = await db.select({ total: count() }).from(teacherReports).innerJoin(teachingAssignments, eq(teacherReports.teachingAssignmentId, teachingAssignments.id)).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).where(and(yearCondition, eq(teacherReports.status, "submitted")));
     const [reportsValidated] = await db.select({ total: count() }).from(teacherReports).innerJoin(teachingAssignments, eq(teacherReports.teachingAssignmentId, teachingAssignments.id)).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).where(and(yearCondition, eq(teacherReports.status, "validated")));
     const [finance] = await db.select({ expected: sum(enrollmentFinancialAccounts.expectedAmount), paid: sum(enrollmentFinancialAccounts.paidAmount) }).from(enrollmentFinancialAccounts).innerJoin(enrollments, eq(enrollmentFinancialAccounts.enrollmentId, enrollments.id)).innerJoin(classes, eq(enrollments.classId, classes.id)).where(yearCondition);
+    const attendance = await db.select({ status: attendanceRecords.status }).from(attendanceRecords).innerJoin(attendanceSessions, eq(attendanceRecords.attendanceSessionId, attendanceSessions.id)).innerJoin(teachingAssignments, eq(attendanceSessions.teachingAssignmentId, teachingAssignments.id)).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).innerJoin(classes, eq(classCourses.classId, classes.id)).where(yearCondition);
+    const recentEvents = await db.select({ id: auditEvents.id, action: auditEvents.action, module: auditEvents.module, resourceType: auditEvents.resourceType, createdAt: auditEvents.createdAt }).from(auditEvents).orderBy(desc(auditEvents.createdAt)).limit(5);
     const decisions = await db.select({ status: deliberationDecisions.status, total: count() }).from(deliberationDecisions).innerJoin(deliberationSessions, eq(deliberationDecisions.deliberationSessionId, deliberationSessions.id)).where(eq(deliberationSessions.academicYearId, input.academicYearId)).groupBy(deliberationDecisions.status);
     const [setting] = await db.select({ id: secondSessionSettings.id, status: secondSessionSettings.status, thresholdPercent: secondSessionSettings.thresholdPercent, registrationDeadline: secondSessionSettings.registrationDeadline, examStartsAt: secondSessionSettings.examStartsAt, examEndsAt: secondSessionSettings.examEndsAt }).from(secondSessionSettings).where(eq(secondSessionSettings.academicYearId, input.academicYearId)).limit(1);
     const academicResults = await getAcademicResultsForYear(db, input.academicYearId, { type: "annual" });
@@ -48,6 +50,8 @@ export const annualControlRouter = router({
       reports: { draft: numeric(reportsDraft?.total), submitted: numeric(reportsSubmitted?.total), validated: numeric(reportsValidated?.total) },
       academic: { comparableEnrollments: comparablePercentages.length, completedEnrollments: academicResults.filter((result) => result.status === "complete").length, averagePercentage: academicAverage, highestPercentage: comparablePercentages.length ? Math.max(...comparablePercentages) : null },
       finance: { expectedAmount, paidAmount, remainingAmount: Math.max(0, expectedAmount - paidAmount), collectionRate: expectedAmount ? Math.round((paidAmount / expectedAmount) * 1000) / 10 : 0 },
+      attendance: { totalRecords: attendance.length, presentOrLateRecords: attendance.filter((record) => record.status === "present" || record.status === "late").length, rate: attendance.length ? Math.round((attendance.filter((record) => record.status === "present" || record.status === "late").length / attendance.length) * 1000) / 10 : null },
+      recentEvents,
       decisions: { draft: decisionCounts.draft ?? 0, proposed: decisionCounts.proposed ?? 0, validated: decisionCounts.validated ?? 0 },
       secondSession: setting ?? null,
     };

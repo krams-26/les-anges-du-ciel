@@ -49,6 +49,8 @@ import {
 import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
+const secondarySections = ["Secondaire", "Littéraire", "Scientifique"];
+
 export type Student = {
   id: string;
   matricule: string;
@@ -57,7 +59,8 @@ export type Student = {
   sex: "F" | "M";
   className: string;
   level: string;
-  registrationType: "Nouvelle inscription" | "Réinscription";
+  section: string;
+  registrationType: string;
   status: "Actif" | "En attente" | "Suspendu";
   balance: number;
   birthDate: string;
@@ -66,16 +69,6 @@ export type Student = {
   enrollmentDate: string;
   documents: number;
 };
-
-const students: Student[] = [
-  { id: "1", matricule: "STU-000145", fullName: "Jean Kabila", initials: "JK", sex: "M", className: "7e A", level: "7e", registrationType: "Réinscription", status: "Actif", balance: 185000, birthDate: "18 mars 2012", parent: "Mme Odette Kabila", phone: "+243 81 430 2290", enrollmentDate: "11 août 2026", documents: 5 },
-  { id: "2", matricule: "STU-000146", fullName: "Sarah Mbayo", initials: "SM", sex: "F", className: "7e A", level: "7e", registrationType: "Nouvelle inscription", status: "Actif", balance: 0, birthDate: "27 juillet 2012", parent: "M. Jean-Pierre Mbayo", phone: "+243 89 816 4455", enrollmentDate: "12 août 2026", documents: 6 },
-  { id: "3", matricule: "STU-000147", fullName: "Grâce Mulumba", initials: "GM", sex: "F", className: "7e B", level: "7e", registrationType: "Réinscription", status: "Actif", balance: 40000, birthDate: "03 mai 2012", parent: "Mme Sylvia Mulumba", phone: "+243 82 664 1092", enrollmentDate: "12 août 2026", documents: 5 },
-  { id: "4", matricule: "STU-000148", fullName: "Yannick Banza", initials: "YB", sex: "M", className: "8e A", level: "8e", registrationType: "Réinscription", status: "Actif", balance: 235000, birthDate: "21 janvier 2011", parent: "M. Patrice Banza", phone: "+243 99 182 4587", enrollmentDate: "13 août 2026", documents: 4 },
-  { id: "5", matricule: "STU-000149", fullName: "Bénédicte Nsimba", initials: "BN", sex: "F", className: "8e A", level: "8e", registrationType: "Nouvelle inscription", status: "En attente", balance: 0, birthDate: "14 novembre 2011", parent: "Mme Chantal Nsimba", phone: "+243 84 277 4019", enrollmentDate: "14 août 2026", documents: 3 },
-  { id: "6", matricule: "STU-000150", fullName: "Amani Mbuyi", initials: "AM", sex: "M", className: "8e B", level: "8e", registrationType: "Réinscription", status: "Actif", balance: 85000, birthDate: "09 février 2011", parent: "M. David Mbuyi", phone: "+243 97 304 6631", enrollmentDate: "15 août 2026", documents: 5 },
-  { id: "7", matricule: "STU-000151", fullName: "Rachel Kanku", initials: "RK", sex: "F", className: "6e A", level: "6e", registrationType: "Nouvelle inscription", status: "Actif", balance: 0, birthDate: "25 septembre 2013", parent: "Mme Marie Kanku", phone: "+243 81 560 8832", enrollmentDate: "16 août 2026", documents: 6 },
-];
 
 function StatusBadge({ status }: { status: Student["status"] }) {
   const className = status === "Actif" ? "success" : status === "En attente" ? "warning" : "error";
@@ -87,6 +80,7 @@ function SortHeader({ children }: { children: React.ReactNode }) {
 }
 
 export function StudentManagement({ onToast, onSuccess, onNavigate }: { onToast: (title: string, description: string) => void; onSuccess: (title: string, description: string) => void; onNavigate: (label: string) => void }) {
+  const utils = trpc.useUtils();
   const [search, setSearch] = useState("");
   const [section, setSection] = useState("Secondaire");
   const [level, setLevel] = useState("Tous");
@@ -101,36 +95,46 @@ export function StudentManagement({ onToast, onSuccess, onNavigate }: { onToast:
   const [importModal, setImportModal] = useState(() => new URLSearchParams(window.location.search).get("import") === "csv");
   const [importedStudents, setImportedStudents] = useState<Student[]>([]);
   const pageSize = 5;
-  const studentsQuery = trpc.school.students.list.useQuery();
-  const persistedStudents = useMemo<Student[]>(() => (studentsQuery.data ?? []).map((student) => ({
+  const yearsQuery = trpc.school.years.list.useQuery();
+  const activeYear = yearsQuery.data?.find((year) => year.code === "2026-2027") ?? yearsQuery.data?.find((year) => year.status === "active") ?? yearsQuery.data?.[0];
+  const classesQuery = trpc.school.classes.list.useQuery({ academicYearId: activeYear?.id ?? 0 }, { enabled: Boolean(activeYear) });
+  const studentsQuery = trpc.school.students.list.useQuery({ academicYearId: activeYear?.id ?? 0 }, { enabled: Boolean(activeYear) });
+  const bulkCreateMutation = trpc.school.students.bulkCreate.useMutation();
+  const persistedStudents = useMemo<Student[]>(() => (studentsQuery.data ?? []).filter((student): student is typeof student & { enrollmentId: number; enrollmentStatus: string; enrollmentType: string; enrolledAt: Date; className: string | null; level: string | null; section: string | null; birthDate: Date | null; phone: string | null; expectedAmount: number | null; paidAmount: number | null } => "enrollmentId" in student).map((student) => ({
     id: String(student.id),
     matricule: student.studentCode,
     fullName: `${student.firstName} ${student.lastName}`,
     initials: `${student.firstName.charAt(0)}${student.lastName.charAt(0)}`.toUpperCase(),
     sex: student.sex,
-    className: "À affecter",
-    level: "—",
-    registrationType: "Nouvelle inscription",
-    status: student.status === "active" ? "Actif" : "Suspendu",
-    balance: 0,
-    birthDate: "À compléter",
-    parent: "À compléter",
-    phone: "À compléter",
-    enrollmentDate: "Dossier créé",
+    className: student.className ?? "Non affectée",
+    level: student.level ?? "—",
+    section: student.section ?? "—",
+    registrationType: student.enrollmentType === "re_enrollment" ? "Réinscription" : student.enrollmentType === "repeat" ? "Redoublement" : student.enrollmentType === "transfer" ? "Transfert" : "Nouvelle inscription",
+    status: student.enrollmentStatus === "active" ? "Actif" : student.enrollmentStatus === "pending" ? "En attente" : "Suspendu",
+    balance: Math.max(0, (student.expectedAmount ?? 0) - (student.paidAmount ?? 0)),
+    birthDate: student.birthDate ? new Date(student.birthDate).toLocaleDateString("fr-FR") : "Non renseignée",
+    parent: "Consulter le dossier",
+    phone: student.phone ?? "Non renseigné",
+    enrollmentDate: new Date(student.enrolledAt).toLocaleDateString("fr-FR"),
     documents: 0,
   })), [studentsQuery.data]);
+  const availableClasses = useMemo(() => (classesQuery.data ?? []).filter((schoolClass) => section === "Secondaire" ? secondarySections.includes(schoolClass.section) : schoolClass.section === section), [classesQuery.data, section]);
+  const availableLevels = useMemo(() => Array.from(new Set(availableClasses.map((schoolClass) => schoolClass.level))), [availableClasses]);
+  const availableSections = useMemo(() => ["Secondaire", ...Array.from(new Set((classesQuery.data ?? []).map((schoolClass) => schoolClass.section).filter((item) => item !== "Secondaire")))], [classesQuery.data]);
+  const registrationTypes = useMemo(() => Array.from(new Set(persistedStudents.map((student) => student.registrationType))), [persistedStudents]);
 
   const filteredStudents = useMemo(() => {
     const normalized = search.trim().toLowerCase();
     return [...importedStudents, ...persistedStudents].filter((student) => {
       const matchesSearch = !normalized || [student.fullName, student.matricule].some((value) => value.toLowerCase().includes(normalized));
+      const matchesSection = section === "Toutes" || (section === "Secondaire" ? secondarySections.includes(student.section) : student.section === section);
       const matchesLevel = level === "Tous" || student.level === level;
       const matchesClass = classFilter === "Toutes" || student.className === classFilter;
       const matchesStatus = status === "Tous" || student.status === status;
       const matchesRegistration = registration === "Toutes" || student.registrationType === registration;
-      return matchesSearch && matchesLevel && matchesClass && matchesStatus && matchesRegistration;
+      return matchesSearch && matchesSection && matchesLevel && matchesClass && matchesStatus && matchesRegistration;
     });
-  }, [search, level, classFilter, status, registration]);
+  }, [search, section, level, classFilter, status, registration, importedStudents, persistedStudents]);
 
   const visibleStudents = filteredStudents.slice((page - 1) * pageSize, page * pageSize);
   const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
@@ -141,10 +145,22 @@ export function StudentManagement({ onToast, onSuccess, onNavigate }: { onToast:
   const toggleAll = (checked: boolean) => setSelectedIds(checked ? Array.from(new Set([...selectedIds, ...visibleStudents.map((student) => student.id)])) : selectedIds.filter((id) => !visibleStudents.some((student) => student.id === id)));
   const resetFilters = () => { setSearch(""); setSection("Secondaire"); setLevel("Tous"); setClassFilter("Toutes"); setStatus("Actif"); setRegistration("Toutes"); setPage(1); };
   const refresh = () => { setIsLoading(true); window.setTimeout(() => { setIsLoading(false); onToast("Liste actualisée", "Les inscriptions de l’année 2026-2027 ont été synchronisées."); }, 650); };
-  const importRows = (rows: CsvStudentRow[]) => {
-    const newStudents = rows.map((row, index) => ({ id: `import-${Date.now()}-${index}`, matricule: `STU-${String(152 + importedStudents.length + index).padStart(6, "0")}`, fullName: `${row.firstName} ${row.lastName}`, initials: `${row.firstName.charAt(0)}${row.lastName.charAt(0)}`.toUpperCase(), sex: row.sex, className: row.className, level: row.className.split(" ")[0] ?? "", registrationType: row.registrationType, status: "Actif" as const, balance: 0, birthDate: "À compléter", parent: "À compléter", phone: row.parentPhone, enrollmentDate: "27 août 2026", documents: 0 }));
-    setImportedStudents((current) => [...newStudents, ...current]);
-    if (newStudents[0]) setSelectedStudentId(newStudents[0].id);
+  const importRows = async (rows: CsvStudentRow[]) => {
+    if (!activeYear) throw new Error("Aucune année scolaire active n’est disponible.");
+    const classByName = new Map((classesQuery.data ?? []).map((schoolClass) => [schoolClass.name, schoolClass]));
+    const groups = new Map<number, CsvStudentRow[]>();
+    for (const row of rows) {
+      const schoolClass = classByName.get(row.className);
+      if (!schoolClass) throw new Error(`La classe « ${row.className} » n’existe pas dans l’année ${activeYear.code}.`);
+      groups.set(schoolClass.id, [...(groups.get(schoolClass.id) ?? []), row]);
+    }
+    const importStamp = Date.now();
+    let position = 0;
+    for (const [classId, classRows] of Array.from(groups.entries())) {
+      await bulkCreateMutation.mutateAsync({ academicYearId: activeYear.id, classId, rows: classRows.map((row) => ({ studentCode: `CSV-${String(importStamp).slice(-8)}-${String(position++).padStart(3, "0")}`, lastName: row.lastName, firstName: row.firstName, sex: row.sex, guardianName: `Responsable de ${row.firstName} ${row.lastName}`, guardianPhone: row.parentPhone })) });
+    }
+    await utils.school.students.list.invalidate();
+    await utils.school.classes.list.invalidate();
     setPage(1);
   };
 
@@ -152,12 +168,13 @@ export function StudentManagement({ onToast, onSuccess, onNavigate }: { onToast:
     <section className="student-management" aria-label="Gestion des élèves">
       <header className="student-page-heading">
         <div><p className="eyebrow">Scolarité · registre annuel</p><h1>Élèves</h1><p>Recherchez une identité élève et pilotez son inscription pour l’année scolaire en cours.</p></div>
-        <div className="student-header-actions"><div className="student-context"><span>Année scolaire : <strong>2026-2027</strong></span><span>Section : <strong>{section}</strong></span></div><Button variant="outline" className="secondary-action" onClick={() => setImportModal(true)}><Upload size={16} /> Importer CSV</Button><Button className="primary-action" onClick={() => setStudentModal(true)}><Plus size={16} /> Ajouter un élève</Button></div>
+        <div className="student-header-actions"><div className="student-context"><span>Année scolaire : <strong>{activeYear?.code ?? "—"}</strong></span><span>Section : <strong>{section}</strong></span></div><Button variant="outline" className="secondary-action" onClick={() => setImportModal(true)}><Upload size={16} /> Importer CSV</Button><Button className="primary-action" onClick={() => setStudentModal(true)}><Plus size={16} /> Ajouter un élève</Button></div>
       </header>
 
       <section className="identity-enrollment-notice"><span className="notice-number">01</span><div><strong>Identité élève et inscription annuelle sont distinctes.</strong><p>Le matricule, l’état civil et les responsables légaux appartiennent au dossier permanent. La classe, le type d’inscription, le statut et le solde correspondent à l’année 2026-2027.</p></div><FileText size={20} /></section>
 
       <section className="student-controls" aria-label="Recherche et filtres">
+        <div className="student-filter-row dynamic-student-filters"><span className="filter-label"><SlidersHorizontal size={15} /> Filtres</span><Select value={section} onValueChange={(value) => { setSection(value); setLevel("Tous"); setClassFilter("Toutes"); setPage(1); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{availableSections.map((item) => <SelectItem key={item} value={item}>Section : {item}</SelectItem>)}</SelectContent></Select><Select value={level} onValueChange={(value) => { setLevel(value); setClassFilter("Toutes"); setPage(1); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Tous">Niveau : Tous</SelectItem>{availableLevels.map((item) => <SelectItem key={item} value={item}>Niveau : {item}</SelectItem>)}</SelectContent></Select><Select value={classFilter} onValueChange={(value) => { setClassFilter(value); setPage(1); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Toutes">Classe : Toutes</SelectItem>{availableClasses.filter((schoolClass) => level === "Tous" || schoolClass.level === level).map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.name}>Classe : {schoolClass.name}</SelectItem>)}</SelectContent></Select><Select value={status} onValueChange={(value) => { setStatus(value); setPage(1); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Tous">Statut : Tous</SelectItem><SelectItem value="Actif">Statut : Actif</SelectItem><SelectItem value="En attente">En attente</SelectItem><SelectItem value="Suspendu">Statut : Suspendu</SelectItem></SelectContent></Select><Select value={registration} onValueChange={(value) => { setRegistration(value); setPage(1); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Toutes">Inscription : Toutes</SelectItem>{registrationTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent></Select><button className="clear-filters" onClick={resetFilters}>Réinitialiser</button></div>
         <div className="student-search"><Search size={18} /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Rechercher un élève par nom, prénom ou matricule..." /></div>
         <div className="student-filter-row"><span className="filter-label"><SlidersHorizontal size={15} /> Filtres</span><Select value={section} onValueChange={setSection}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Secondaire">Section : Secondaire</SelectItem><SelectItem value="Primaire">Section : Primaire</SelectItem></SelectContent></Select><Select value={level} onValueChange={(value) => { setLevel(value); setPage(1); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Tous">Niveau : Tous</SelectItem><SelectItem value="6e">Niveau : 6e</SelectItem><SelectItem value="7e">Niveau : 7e</SelectItem><SelectItem value="8e">Niveau : 8e</SelectItem></SelectContent></Select><Select value={classFilter} onValueChange={(value) => { setClassFilter(value); setPage(1); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Toutes">Classe : Toutes</SelectItem>{["6e A", "7e A", "7e B", "8e A", "8e B"].map((item) => <SelectItem key={item} value={item}>Classe : {item}</SelectItem>)}</SelectContent></Select><Select value={status} onValueChange={(value) => { setStatus(value); setPage(1); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Tous">Statut : Tous</SelectItem><SelectItem value="Actif">Statut : Actif</SelectItem><SelectItem value="En attente">Statut : En attente</SelectItem><SelectItem value="Suspendu">Statut : Suspendu</SelectItem></SelectContent></Select><Select value={registration} onValueChange={(value) => { setRegistration(value); setPage(1); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Toutes">Inscription : Toutes</SelectItem><SelectItem value="Nouvelle inscription">Nouvelle inscription</SelectItem><SelectItem value="Réinscription">Réinscription</SelectItem></SelectContent></Select><button className="clear-filters" onClick={resetFilters}>Réinitialiser</button></div>
       </section>
@@ -172,7 +189,7 @@ export function StudentManagement({ onToast, onSuccess, onNavigate }: { onToast:
 
         <aside className="student-summary" aria-label="Synthèse de l’élève sélectionné">{selectedStudent ? <><div className="summary-heading"><div><p className="eyebrow">Élève sélectionné</p><h2>Synthèse du dossier</h2></div><UserRound size={18} /></div><div className="summary-person"><span className={`student-photo student-photo-${selectedStudent.sex.toLowerCase()}`}>{selectedStudent.initials}</span><div><strong>{selectedStudent.fullName}</strong><small>{selectedStudent.matricule}</small></div></div><div className="summary-section"><p>Identité permanente</p><dl><div><dt>Date de naissance</dt><dd>{selectedStudent.birthDate}</dd></div><div><dt>Responsable légal</dt><dd>{selectedStudent.parent}</dd></div><div><dt>Contact</dt><dd>{selectedStudent.phone}</dd></div></dl></div><div className="summary-section annual"><p>Inscription 2026-2027</p><dl><div><dt>Classe actuelle</dt><dd>{selectedStudent.className}</dd></div><div><dt>Type</dt><dd>{selectedStudent.registrationType}</dd></div><div><dt>Statut</dt><dd><StatusBadge status={selectedStudent.status} /></dd></div><div><dt>Solde</dt><dd className={selectedStudent.balance > 100000 ? "balance balance-high" : "balance"}>{selectedStudent.balance === 0 ? "À jour" : `${selectedStudent.balance.toLocaleString("fr-FR")} CDF`}</dd></div></dl></div><div className="summary-documents"><FileText size={16} /><span><strong>{selectedStudent.documents} documents au dossier</strong><small>Inscription enregistrée le {selectedStudent.enrollmentDate}</small></span></div><div className="summary-actions"><button onClick={() => onNavigate("Profil élève")}><Eye size={15} /> Voir le dossier</button><button onClick={() => onToast("Finances", `La situation financière de ${selectedStudent.fullName} est prête à être consultée.`)}><WalletCards size={15} /> Voir les finances</button></div></> : <div className="summary-empty"><CircleAlert size={22} /><h3>Aucun élève sélectionné</h3><p>Sélectionnez une ligne du registre pour afficher la synthèse de son dossier.</p></div>}</aside>
       </section>
-      <QuickActionModal action={studentModal ? "student" : null} onClose={() => setStudentModal(false)} onSuccess={onSuccess} />
+      <QuickActionModal action={studentModal ? "student" : null} onClose={() => setStudentModal(false)} onSuccess={onSuccess} onNavigate={onNavigate} />
       <StudentCsvImportModal open={importModal} onClose={() => setImportModal(false)} onImport={importRows} onSuccess={onSuccess} />
     </section>
   );

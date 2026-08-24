@@ -216,3 +216,15 @@
 - [x] Corriger sans perte de données la structure en 7e A/B, 8e A/B, puis 1ère à 4e en Littéraire et Scientifique.
 - [x] Vérifier la préparation annuelle et les protections anti-doublons avec cette structure configurée.
 - [x] Valider TypeScript, tests, vérification de données et build, puis synchroniser GitHub.
+
+## Suivi — Raccordement fonctionnel des modules existants
+
+- [x] Auditer les formulaires, filtres, indicateurs et actions encore alimentés par des données statiques ou des retours informatifs.
+- [x] Raccorder le tableau de bord à l’année, aux classes et aux indicateurs persistants disponibles.
+- [x] Raccorder les filtres et les agrégats de l’écran Classes aux données annuelles persistantes.
+- [x] Connecter les cinq actions rapides du tableau de bord aux mutations persistantes ou au relevé calculé existant.
+- [x] Convertir l’import CSV du registre élèves en créations persistantes par classe et année scolaire.
+- [x] Remplacer les sélecteurs historiques codés en dur de l’assistant complet d’inscription par les années et classes persistantes.
+- [x] Ajouter ou adapter les tests de procédures et vérifier les parcours administratifs dans le navigateur.
+- [x] Valider TypeScript, tests et build.
+- [ ] Synchroniser la correction validée sur GitHub après le checkpoint.

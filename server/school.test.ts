@@ -25,6 +25,12 @@ describe("validations des opérations scolaires", () => {
     expect(() => schoolInputs.studentCreate.parse({ studentCode: "STU-004202", lastName: "Kabila", firstName: "Jean", sex: "M", academicYearId: 1, enrollmentType: "new", guardians: [] })).toThrow();
   });
 
+  it("accepte un lot CSV annuel avec une classe persistante et refuse les lignes incomplètes", () => {
+    const valid = schoolInputs.studentBulkCreate.parse({ academicYearId: 1, classId: 12, rows: [{ studentCode: "CSV-2026-001", lastName: "Banza", firstName: "Jonathan", sex: "M", guardianName: "Responsable Banza", guardianPhone: "+243810000000" }] });
+    expect(valid.rows).toHaveLength(1);
+    expect(() => schoolInputs.studentBulkCreate.parse({ academicYearId: 1, classId: 12, rows: [{ studentCode: "CSV-2026-002", lastName: "", firstName: "Jonathan", sex: "M" }] })).toThrow();
+  });
+
   it("normalise les codes de cours et d’employé en majuscules", () => {
     expect(schoolInputs.courseCreate.parse({ code: "math", name: "Mathématiques", section: "Secondaire", levels: "7e" }).code).toBe("MATH");
     expect(schoolInputs.teacherCreate.parse({ employeeCode: "emp-100", fullName: "Mme Sophie Lukusa" }).employeeCode).toBe("EMP-100");

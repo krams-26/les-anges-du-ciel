@@ -302,6 +302,7 @@ export default function Home() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [academicYear, setAcademicYear] = useState("2026-2027");
+  const yearsQuery = trpc.school.years.list.useQuery();
   const searchInput = useMemo(() => ({ query: searchTerm.trim(), category: searchCategory }), [searchCategory, searchTerm]);
   const globalSearch = trpc.personal.search.useQuery(searchInput, { enabled: searchOpen && searchTerm.trim().length >= 2 });
 
@@ -403,10 +404,7 @@ export default function Home() {
           <div className="topbar-actions">
             <Select value={academicYear} onValueChange={setAcademicYear}>
               <SelectTrigger className="year-select"><CalendarDays size={16} /><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="2026-2027">2026-2027</SelectItem>
-                <SelectItem value="2025-2026">2025-2026</SelectItem>
-              </SelectContent>
+              <SelectContent>{(yearsQuery.data ?? []).map((year) => <SelectItem key={year.id} value={year.code}>{year.code}</SelectItem>)}</SelectContent>
             </Select>
             <button className="icon-button desktop-only" onClick={() => setSearchOpen(true)} aria-label="Rechercher"><Search size={19} /></button>
             <button className="icon-button notification-button" onClick={() => navigate("Notifications")} aria-label="Notifications"><Bell size={19} /><span /></button>
@@ -435,12 +433,12 @@ export default function Home() {
               <h1>{isSystem ? "Bibliothèque UI" : activeNav}</h1>
               <p className="page-subtitle">{isSystem ? "États, contrôles et modèles réutilisables de l’application." : "Suivez les données essentielles de l’établissement dans leur contexte courant."}</p>
             </div>
-            {!isSystem && <Button className="primary-action page-action" onClick={() => showToast("Nouvelle opération", "Le formulaire adapté au module s’ouvrirait ici.")}><Plus size={17} /> Nouvelle opération</Button>}
+            {!isSystem && <Button className="primary-action page-action" onClick={() => navigate("Inscription / Réinscription")}><Plus size={17} /> Nouvelle opération</Button>}
           </section>}
 
-          {!isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && !isTeacherSuite && !isParentSuite && !isPersonalCenter && !isSearchResult && !isAnnualControl && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill><ContextPill>Classe : 7e A</ContextPill></div>}
+          {!isDashboard && !isSystem && !isAdminDashboard && !isStudents && !isStudentProfile && !isEnrollment && !isClasses && !isClassWorkspace && !isAcademicSuite && !isTeacherSuite && !isParentSuite && !isPersonalCenter && !isSearchResult && !isAnnualControl && <div className="context-rail"><ContextPill>Année scolaire {academicYear}</ContextPill><ContextPill>Section : Secondaire</ContextPill></div>}
 
-          {isDashboard && role === "admin" && (
+          {false && isDashboard && role === "admin" && (
             <>
               <div className="register-band" aria-label="Repère de registre">
                 <span><i /> Indicateurs de l’établissement</span>
@@ -496,7 +494,8 @@ export default function Home() {
           )}
 
           {isSystem && role === "admin" && <DesignSystemShowcase onToast={showToast} />}
-          {isAdminDashboard && role === "admin" && <AdminDashboard onNavigate={navigate} onAction={showSuccessToast} />}
+          {isDashboard && role === "admin" && <AdminDashboard onNavigate={navigate} onAction={showSuccessToast} academicYearCode={academicYear} />}
+          {isAdminDashboard && role === "admin" && <AdminDashboard onNavigate={navigate} onAction={showSuccessToast} academicYearCode={academicYear} />}
           {isStudents && role === "admin" && <StudentManagement onToast={showToast} onSuccess={showSuccessToast} onNavigate={navigate} />}
           {isStudentProfile && role === "admin" && <StudentProfile onBack={() => navigate("Élèves")} onToast={showToast} />}
           {isEnrollment && role === "admin" && <EnrollmentWizard onBack={() => navigate("Élèves")} onSuccess={showSuccessToast} />}

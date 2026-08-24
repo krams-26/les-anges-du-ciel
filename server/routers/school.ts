@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, like, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -8,6 +8,7 @@ import {
   classCourses,
   classes,
   courses,
+  enrollmentFinancialAccounts,
   enrollments,
   guardians,
   guardianUserLinks,
@@ -142,8 +143,12 @@ export const schoolRouter = router({
     list: adminProcedure.input(z.object({ academicYearId: z.number().int().positive().optional(), search: z.string().trim().max(120).optional() }).optional()).query(async ({ ctx, input }) => {
       await assertPermission(ctx.user.id, "students", "view");
       const db = await database();
-      const base = db.select({ id: students.id, studentCode: students.studentCode, lastName: students.lastName, firstName: students.firstName, sex: students.sex, status: students.status }).from(students).orderBy(asc(students.lastName), asc(students.firstName));
-      return base;
+      if (!input?.academicYearId) {
+        const searchCondition = input?.search ? or(like(students.studentCode, `%${input.search}%`), like(students.lastName, `%${input.search}%`), like(students.firstName, `%${input.search}%`)) : undefined;
+        return db.select({ id: students.id, studentCode: students.studentCode, lastName: students.lastName, firstName: students.firstName, sex: students.sex, status: students.status }).from(students).where(searchCondition).orderBy(asc(students.lastName), asc(students.firstName));
+      }
+      const annualCondition = input.search ? and(eq(enrollments.academicYearId, input.academicYearId), or(like(students.studentCode, `%${input.search}%`), like(students.lastName, `%${input.search}%`), like(students.firstName, `%${input.search}%`))) : eq(enrollments.academicYearId, input.academicYearId);
+      return db.select({ id: students.id, studentCode: students.studentCode, lastName: students.lastName, postName: students.postName, firstName: students.firstName, sex: students.sex, status: students.status, birthDate: students.birthDate, phone: students.phone, enrollmentId: enrollments.id, enrollmentStatus: enrollments.status, enrollmentType: enrollments.enrollmentType, enrolledAt: enrollments.enrolledAt, classId: classes.id, className: classes.name, level: classes.level, section: classes.section, expectedAmount: enrollmentFinancialAccounts.expectedAmount, paidAmount: enrollmentFinancialAccounts.paidAmount }).from(enrollments).innerJoin(students, eq(enrollments.studentId, students.id)).leftJoin(classes, eq(enrollments.classId, classes.id)).leftJoin(enrollmentFinancialAccounts, eq(enrollments.id, enrollmentFinancialAccounts.enrollmentId)).where(annualCondition).orderBy(asc(students.lastName), asc(students.firstName));
     }),
     create: adminProcedure.input(schoolInputs.studentCreate).mutation(async ({ ctx, input }) => {
       await assertPermission(ctx.user.id, "students", "create");
@@ -222,7 +227,17 @@ export const schoolRouter = router({
     }),
   }),
   classes: router({
-    list: adminProcedure.input(z.object({ academicYearId: z.number().int().positive(), includeDraft: z.boolean().default(false) })).query(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "enrollments", "view"); const db = await database(); return db.select().from(classes).where(input.includeDraft ? eq(classes.academicYearId, input.academicYearId) : and(eq(classes.academicYearId, input.academicYearId), eq(classes.status, "active"))).orderBy(asc(classes.level), asc(classes.name)); }),
+    list: adminProcedure.input(z.object({ academicYearId: z.number().int().positive(), includeDraft: z.boolean().default(false) })).query(async ({ ctx, input }) => {
+      await assertPermission(ctx.user.id, "enrollments", "view");
+      const db = await database();
+      const classRows = await db.select().from(classes).where(input.includeDraft ? eq(classes.academicYearId, input.academicYearId) : and(eq(classes.academicYearId, input.academicYearId), eq(classes.status, "active"))).orderBy(asc(classes.level), asc(classes.name));
+      const classIds = classRows.map((schoolClass) => schoolClass.id);
+      if (!classIds.length) return [];
+      const activeEnrollments = await db.select({ classId: enrollments.classId }).from(enrollments).where(and(eq(enrollments.academicYearId, input.academicYearId), eq(enrollments.status, "active"), inArray(enrollments.classId, classIds)));
+      const configuredCourses = await db.select({ classId: classCourses.classId }).from(classCourses).where(and(inArray(classCourses.classId, classIds), eq(classCourses.status, "configured")));
+      const activeAssignments = await db.select({ classId: classCourses.classId }).from(teachingAssignments).innerJoin(classCourses, eq(teachingAssignments.classCourseId, classCourses.id)).where(and(inArray(classCourses.classId, classIds), eq(teachingAssignments.status, "active")));
+      return classRows.map((schoolClass) => ({ ...schoolClass, activeStudentCount: activeEnrollments.filter((enrollment) => enrollment.classId === schoolClass.id).length, configuredCourseCount: configuredCourses.filter((course) => course.classId === schoolClass.id).length, activeTeacherCount: activeAssignments.filter((assignment) => assignment.classId === schoolClass.id).length }));
+    }),
     create: adminProcedure.input(schoolInputs.classCreate).mutation(async ({ ctx, input }) => { await assertPermission(ctx.user.id, "enrollments", "create"); const db = await database(); await db.insert(classes).values({ ...input, status: "draft" }); return { ok: true }; }),
   }),
   courses: router({
