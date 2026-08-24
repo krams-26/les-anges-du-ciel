@@ -196,4 +196,4 @@
 - [x] Implémenter les procédures sécurisées de saisie, validation, rejet, annulation, reçu et audit.
 - [x] Étendre les permissions fines finance.view/create/edit/validate/cancel/export/print.
 - [x] Couvrir les paiements, plafonds, statuts, taux et conservation historique par des tests.
-- [ ] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
+- [x] Valider TypeScript, tests, e2e pertinent et build, puis synchroniser GitHub.
