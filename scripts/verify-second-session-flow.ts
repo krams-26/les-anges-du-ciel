@@ -1,6 +1,8 @@
 import { appRouter } from "../server/routers";
 import { closeDbPool } from "../server/db";
 
+let completed = false;
+
 const caller = appRouter.createCaller({ user: { id: 1, openId: "test-admin", name: "Administrateur de test", email: null, loginMethod: "test", role: "admin", createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as never, res: {} as never });
 
 try {
@@ -29,6 +31,8 @@ try {
   const afterRectification = await caller.secondSession.deliberation.history({ decisionId: proposed.id });
   if (!afterRectification.some((event) => event.action === "rectified")) throw new Error("Audit de rectification introuvable.");
   console.log(JSON.stringify({ verified: true, settingId: setting.id, evaluated: evaluation.processed, candidates: candidates.length, decisions: initialized.initialized, validatedDecisionId: proposed.id, auditActions: afterRectification.map((event) => event.action) }, null, 2));
+  completed = true;
 } finally {
   await closeDbPool();
+  if (completed) process.exit(0);
 }

@@ -1,6 +1,8 @@
 import { appRouter } from "../server/routers";
 import { closeDbPool } from "../server/db";
 
+let completed = false;
+
 try {
   const parentUserId = 600005;
   const enrollmentId = 1;
@@ -14,6 +16,8 @@ try {
   await caller.parent.preferences.update({ guardianId, appNotifications: true, sms: true, whatsapp: false, email: true, results: true, attendance: true, finance: true, general: true });
   const notifications = await caller.parent.notifications.list();
   console.log(JSON.stringify({ verified: true, children: children.length, results: results.length, attendance: attendance.length, payments: finances.payments.length, preferences: preferences.length, notifications: notifications.length }, null, 2));
+  completed = true;
 } finally {
   await closeDbPool();
+  if (completed) process.exit(0);
 }

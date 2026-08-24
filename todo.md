@@ -83,6 +83,7 @@
 - [x] Fiabiliser les écritures groupées de présence et de notes afin d’éviter les expirations de connexion.
 - [x] Fiabiliser le client Drizzle utilisé par les vérifications tRPC afin d’éviter les expirations intermittentes du pool callback.
 - [ ] Réduire et fermer proprement les connexions de vérification afin d’éviter les délais intermittents de la base distante.
+- [ ] Relancer chaque script de vérification après correction et confirmer sa terminaison sans processus résiduel.
 - [x] Mettre à niveau le projet avec comptes utilisateurs et base de données de test.
 - [x] Créer les tables et les procédures des dossiers scolaires, classes, cours, enseignants et affectations.
 - [ ] Connecter les dernières actions contextuelles aux opérations persistantes et remplacer les éléments purement informatifs.
@@ -122,7 +123,7 @@
 - [x] Ajouter les états réseau de chargement, erreur, succès et absence d’affectation dans les vues enseignants.
 - [x] Ajouter un test de refus d’une affectation non liée au compte enseignant.
 - [ ] Vérifier les vues enseignants connectées en desktop et mobile avec les données de test.
-- [ ] Ajouter les états de chargement, erreur et vide de roster/période dans les vues Élèves, Notes et Rapport.
+- [x] Ajouter les états de chargement, erreur et vide de roster/période dans les vues Élèves, Notes et Rapport.
 
 ## Suivi — Contrôle annuel et autorisations fines
 

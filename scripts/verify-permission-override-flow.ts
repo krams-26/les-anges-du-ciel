@@ -3,6 +3,7 @@ import { closeDbPool } from "../server/db";
 
 const admin = appRouter.createCaller({ user: { id: 1, openId: "test-admin", name: "Administrateur de test", email: null, loginMethod: "test", role: "admin", accountStatus: "active", accessRoleId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as never, res: {} as never });
 const parent = appRouter.createCaller({ user: { id: 600005, openId: "test-parent-open-id", name: "Parent portail de test", email: null, loginMethod: "test", role: "parent", accountStatus: "active", accessRoleId: 3, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as never, res: {} as never });
+let completed = false;
 
 try {
   const children = await parent.parent.children();
@@ -31,8 +32,10 @@ try {
   await admin.governance.permissions.resetOverride({ userId: 600005, resource: "students", action: "view" });
   const transverseAfterReset = await parent.personal.search({ query: "Test", category: "students" });
   console.log(JSON.stringify({ verified: true, enrollmentId, resultsBefore: before.length, resultsAfterReset: after.length, refusalObserved: refused, transverseRefusalObserved, transverseResultsAfterReset: transverseAfterReset.length }, null, 2));
+  completed = true;
 } finally {
   try { await admin.governance.permissions.resetOverride({ userId: 600005, resource: "grades", action: "view" }); } catch { /* la réinitialisation de sûreté ne doit pas masquer le résultat principal */ }
   try { await admin.governance.permissions.resetOverride({ userId: 600005, resource: "students", action: "view" }); } catch { /* la réinitialisation de sûreté ne doit pas masquer le résultat principal */ }
   await closeDbPool();
+  if (completed) process.exit(0);
 }

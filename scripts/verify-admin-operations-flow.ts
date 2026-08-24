@@ -3,6 +3,7 @@ import { closeDbPool } from "../server/db";
 
 const caller = appRouter.createCaller({ user: { id: 1, openId: "test-admin", name: "Administrateur de test", email: null, loginMethod: "test", role: "admin", accountStatus: "active", accessRoleId: 1, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() }, req: {} as never, res: {} as never });
 const stamp = Date.now();
+let completed = false;
 
 try {
   const years = await caller.school.years.list();
@@ -36,6 +37,8 @@ try {
   await caller.governance.permissions.resetOverride({ userId: 600005, resource: "students", action: "view" });
 
   console.log(JSON.stringify({ verified: true, academicYearId: year.id, classId: createdClass.id, courseId: createdCourse.id, teacherId: teacher.id, assignmentId: assignment.id, governanceOverrideReset: true }, null, 2));
+  completed = true;
 } finally {
   await closeDbPool();
+  if (completed) process.exit(0);
 }
