@@ -115,14 +115,14 @@
 - [x] Ajouter le tableau de bord et l’espace « Mes enseignements » réservés à l’enseignant.
 - [x] Ajouter l’appel mobile, l’historique, les évaluations et les saisies de notes.
 - [x] Contrôler les permissions par affectation, les validations et les états réseau.
-- [ ] Vérifier les vues desktop et mobile puis enregistrer la livraison.
+- [x] Vérifier les vues desktop et mobile puis enregistrer la livraison.
 - [x] Supprimer le basculement manuel de rôle et protéger strictement les vues enseignants par session authentifiée.
 - [x] Rediriger les actions enseignants vers les vues pédagogiques autorisées, sans exposer le registre administratif global.
 - [x] Corriger les options d’évaluation et valider complètement les notes avec des messages d’erreur de champ.
 - [x] Connecter TeacherSuite aux lectures et mutations tRPC de présence, notes et rapports.
 - [x] Ajouter les états réseau de chargement, erreur, succès et absence d’affectation dans les vues enseignants.
 - [x] Ajouter un test de refus d’une affectation non liée au compte enseignant.
-- [ ] Vérifier les vues enseignants connectées en desktop et mobile avec les données de test.
+- [x] Vérifier les vues enseignants connectées en desktop et mobile avec les données de test.
 - [x] Ajouter les états de chargement, erreur et vide de roster/période dans les vues Élèves, Notes et Rapport.
 
 ## Suivi — Contrôle annuel et autorisations fines
